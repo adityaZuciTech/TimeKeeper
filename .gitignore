@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────
+#  TimeKeeper – .gitignore
+# ─────────────────────────────────────────
+
+# ── Backend: Maven build output ──────────
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.ear
+backend/mvnw
+backend/mvnw.cmd
+backend/.mvn/
+
+# ── Backend: compiled class files ────────
+**/*.class
+
+# ── Backend: Spring Boot app properties (if they contain secrets) ──
+# Uncomment the lines below if you move secrets to a local-only file
+# backend/src/main/resources/application-local.properties
+# backend/src/main/resources/application-secrets.properties
+
+# ── Backend: H2 database files ───────────
+*.db
+*.mv.db
+*.trace.db
+
+# ── Backend: Log files ───────────────────
+logs/
+*.log
+*.log.*
+
+# ── Frontend: dependencies ───────────────
+node_modules/
+frontend/node_modules/
+
+# ── Frontend: build output ───────────────
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+
+# ── Frontend: environment files ──────────
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# ── IDE & Editor ─────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iml
+*.iws
+*.ipr
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.settings/
+.factorypath
+
+# ── OS generated files ───────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Misc ─────────────────────────────────
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
