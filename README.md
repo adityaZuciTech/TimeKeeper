@@ -39,7 +39,7 @@ npm -version
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/TimeKeeper.git
+git clone https://github.com/adityaZuciTech/TimeKeeper.git
 cd TimeKeeper
 ```
 
