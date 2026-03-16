@@ -31,19 +31,22 @@ export default function TeamMemberTimesheets() {
   return (
     <Layout>
       <div className="mb-6">
-        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-sm mb-3 block">← Back to Team</button>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 mb-4 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          Back to Team
+        </button>
+        <h1 className="text-2xl font-heading font-bold text-foreground">
           {employee ? `${employee.name}'s Timesheets` : 'Timesheets'}
         </h1>
         {employee && (
-          <p className="text-sm text-gray-500 mt-1">{employee.role} · {employee.departmentName}</p>
+          <p className="text-sm text-muted-foreground mt-1">{employee.role} · {employee.departmentName}</p>
         )}
       </div>
 
       {loading ? <LoadingSpinner /> : (
         <div className="card">
           {timesheets.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">No timesheets found</p>
+            <div className="text-center py-10 text-gray-400">No timesheets found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -57,8 +60,8 @@ export default function TeamMemberTimesheets() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {timesheets.map(ts => (
-                    <tr key={ts.id} className="hover:bg-gray-50">
-                      <td className="table-cell font-medium">
+                    <tr key={ts.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="table-cell font-body font-medium text-foreground">
                         {format(new Date(ts.weekStartDate), 'MMM d')} – {format(new Date(ts.weekEndDate), 'MMM d, yyyy')}
                       </td>
                       <td className="table-cell">{Number(ts.totalHours || 0).toFixed(1)} hrs</td>
@@ -66,7 +69,7 @@ export default function TeamMemberTimesheets() {
                       <td className="table-cell">
                         <button
                           onClick={() => navigate(`/timesheets/${ts.id}`)}
-                          className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                          className="text-primary hover:text-primary/80 text-sm font-heading font-medium"
                         >
                           View
                         </button>

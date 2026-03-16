@@ -33,6 +33,13 @@ public class TimesheetService {
     @Transactional
     public TimesheetResponse createOrGetForWeek(String employeeId, CreateTimesheetRequest request) {
         LocalDate weekStart = normalizeToMonday(request.getWeekStartDate());
+        LocalDate today = LocalDate.now();
+        LocalDate currentWeekStart = today.with(DayOfWeek.MONDAY);
+
+        if (weekStart.isAfter(currentWeekStart)) {
+            throw new BusinessException("Cannot create a timesheet for a future week.");
+        }
+
         LocalDate weekEnd = weekStart.plusDays(4); // Friday
 
         Optional<Timesheet> existing = timesheetRepository.findByEmployeeIdAndWeekStartDate(employeeId, weekStart);

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { fetchMyTimesheets, createTimesheet, selectMyTimesheets, selectTimesheetsLoading } from '../../features/timesheets/timesheetSlice'
 import Layout from '../../components/Layout'
-import { StatusBadge, LoadingSpinner, PageHeader } from '../../components/ui'
+import { StatusBadge, LoadingSpinner, PageHeader, EmptyState } from '../../components/ui'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 
@@ -63,12 +63,12 @@ export default function Timesheets() {
       {loading ? <LoadingSpinner /> : (
         <div className="card">
           {timesheets.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-gray-400 mb-4">No timesheets found. Start by creating one for this week.</p>
-              <button className="btn-primary" onClick={handleCreateNew}>
-                Create Timesheet
-              </button>
-            </div>
+            <EmptyState
+              message="No timesheets yet. Start by creating one for this week."
+              action={
+                <button className="btn-primary" onClick={handleCreateNew}>Create This Week</button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -82,14 +82,14 @@ export default function Timesheets() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {timesheets.map((ts) => (
-                    <tr key={ts.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="table-cell font-medium">{weekLabel(ts)}</td>
-                      <td className="table-cell">{Number(ts.totalHours || 0).toFixed(1)} hrs</td>
+                    <tr key={ts.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="table-cell font-body font-medium text-foreground">{weekLabel(ts)}</td>
+                      <td className="table-cell text-muted-foreground">{Number(ts.totalHours || 0).toFixed(1)} hrs</td>
                       <td className="table-cell"><StatusBadge status={ts.status} /></td>
                       <td className="table-cell">
                         <button
                           onClick={() => handleOpenTimesheet(ts.id)}
-                          className="text-primary-600 hover:text-primary-800 font-medium text-sm"
+                          className="text-primary hover:text-primary/80 font-heading font-medium text-sm"
                         >
                           {ts.status === 'SUBMITTED' ? 'View' : 'Edit / Fill'}
                         </button>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, PageHeader } from '../../components/ui'
+import { LoadingSpinner, PageHeader, StatCard } from '../../components/ui'
 import { format } from 'date-fns'
 
 function getCurrentMonday() {
@@ -38,25 +38,30 @@ export default function Organization() {
         subtitle={`Week of ${format(getCurrentMonday(), 'MMM d, yyyy')}`}
       />
 
-      {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-primary-600">{departments.length}</p>
-          <p className="text-sm text-gray-500 mt-1">Departments</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-primary-600">{totalEmployees}</p>
-          <p className="text-sm text-gray-500 mt-1">Total Employees</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-primary-600">{totalHours.toFixed(0)}</p>
-          <p className="text-sm text-gray-500 mt-1">Total Hours This Week</p>
-        </div>
+        <StatCard
+          title="Departments"
+          value={departments.length}
+          color="blue"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+        />
+        <StatCard
+          title="Total Employees"
+          value={totalEmployees}
+          color="green"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+        />
+        <StatCard
+          title="Hours This Week"
+          value={totalHours.toFixed(0)}
+          color="amber"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+        />
       </div>
 
       {loading ? <LoadingSpinner /> : (
         <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Department Utilization</h2>
+          <h2 className="text-lg font-heading font-semibold text-foreground mb-4">Department Utilization</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="border-b border-gray-100">
@@ -78,20 +83,20 @@ export default function Organization() {
                     : 0
 
                   return (
-                    <tr key={dept.departmentId} className="hover:bg-gray-50">
-                      <td className="table-cell font-medium">{dept.departmentName}</td>
+                    <tr key={dept.departmentId} className="hover:bg-muted/30 transition-colors">
+                      <td className="table-cell font-heading font-medium text-foreground">{dept.departmentName}</td>
                       <td className="table-cell">{dept.employeeCount}</td>
-                      <td className="table-cell font-medium">{Number(dept.totalHours || 0).toFixed(0)} hrs</td>
-                      <td className="table-cell text-gray-500">{avg} hrs</td>
+                      <td className="table-cell font-heading font-medium text-foreground">{Number(dept.totalHours || 0).toFixed(0)} hrs</td>
+                      <td className="table-cell text-muted-foreground">{avg} hrs</td>
                       <td className="table-cell">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-100 rounded-full h-2">
+                          <div className="flex-1 bg-border/50 rounded-full h-1.5">
                             <div
-                              className="bg-primary-500 h-2 rounded-full"
+                              className="bg-primary h-1.5 rounded-full"
                               style={{ width: `${utilPct}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-600 w-10">{utilPct}%</span>
+                          <span className="text-xs text-muted-foreground w-10">{utilPct}%</span>
                         </div>
                       </td>
                     </tr>

@@ -39,40 +39,41 @@ export default function Profile() {
 
   return (
     <Layout>
-      <PageHeader title="My Profile" />
+      <PageHeader title="My Profile" subtitle="Manage your account settings" />
 
       <div className="max-w-2xl space-y-6">
         {/* Profile card */}
         <div className="card">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-full bg-primary-600 text-white flex items-center justify-center text-2xl font-bold">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-2xl font-bold shadow-md">
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">{user?.name}</h2>
-              <p className="text-gray-500">{user?.email}</p>
+              <p className="text-gray-500 text-sm">{user?.email}</p>
+              <span className="inline-flex items-center mt-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-0.5 rounded-full">{user?.role}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Role</p>
-              <p className="font-semibold text-gray-900">{user?.role}</p>
+            <div className="bg-muted rounded-md p-4">
+              <p className="text-xs text-muted-foreground mb-1">Role</p>
+              <p className="font-heading font-semibold text-foreground">{user?.role}</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Department</p>
-              <p className="font-semibold text-gray-900">{user?.departmentName || 'Not assigned'}</p>
+            <div className="bg-muted rounded-md p-4">
+              <p className="text-xs text-muted-foreground mb-1">Department</p>
+              <p className="font-heading font-semibold text-foreground">{user?.departmentName || 'Not assigned'}</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4 col-span-2">
-              <p className="text-xs text-gray-500 mb-1">Employee ID</p>
-              <p className="font-semibold text-gray-900 font-mono text-sm">{user?.id}</p>
+            <div className="bg-muted rounded-md p-4 col-span-2">
+              <p className="text-xs text-muted-foreground mb-1">Employee ID</p>
+              <p className="font-heading font-semibold text-foreground font-mono text-sm">{user?.id}</p>
             </div>
           </div>
         </div>
 
         {/* Change password */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
+          <h3 className="text-lg font-heading font-semibold text-foreground mb-4">Change Password</h3>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div>
               <label className="label">Current Password</label>

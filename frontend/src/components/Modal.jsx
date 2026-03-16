@@ -1,28 +1,30 @@
+import { X } from 'lucide-react'
+
 export default function Modal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4">
+      <div className="flex items-center justify-center min-h-screen px-4 py-6">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 transition-opacity"
+          className="fixed inset-0 bg-foreground/50 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         />
-        {/* Modal */}
-        <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 z-10">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        {/* Panel */}
+        <div className="relative bg-card rounded-lg border border-border shadow-xl w-full max-w-md z-10 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h3 className="text-base font-heading font-semibold text-foreground">{title}</h3>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X size={18} />
             </button>
           </div>
-          {children}
+          <div className="px-6 py-5">
+            {children}
+          </div>
         </div>
       </div>
     </div>

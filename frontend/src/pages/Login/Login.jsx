@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { login, selectIsAuthenticated, selectAuthError, selectAuthLoading, clearError } from '../../features/auth/authSlice'
 import toast from 'react-hot-toast'
+import { Clock, Eye, EyeOff, BarChart2, Users, Timer } from 'lucide-react'
+
+const features = [
+  { Icon: Timer,    label: 'Track time across projects',    desc: 'Log work hours with precision across multiple projects' },
+  { Icon: BarChart2, label: 'Real-time utilization reports', desc: 'Visual insights for managers and admins' },
+  { Icon: Users,    label: 'Team-based access control',    desc: 'Role-based views for Employees, Managers & Admins' },
+]
+
+const demoAccounts = [
+  { role: 'Admin',    email: 'admin@timekeeper.app',   password: 'Admin123!' },
+  { role: 'Manager',  email: 'manager@timekeeper.app', password: 'Manager123!' },
+  { role: 'Employee', email: 'john@timekeeper.app',    password: 'Employee123!' },
+]
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -20,10 +33,7 @@ export default function Login() {
   }, [isAuthenticated, navigate])
 
   useEffect(() => {
-    if (error) {
-      toast.error(error)
-      dispatch(clearError())
-    }
+    if (error) { toast.error(error); dispatch(clearError()) }
   }, [error, dispatch])
 
   const handleSubmit = (e) => {
@@ -32,79 +42,121 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center text-white font-bold">
-              TK
+    <div className="min-h-screen flex">
+      {/* Left panel - branding */}
+      <div className="hidden lg:flex lg:w-[52%] bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
+            <Clock size={18} className="text-primary-foreground" />
+          </div>
+          <span className="text-[15px] font-heading font-semibold text-sidebar-foreground tracking-tight">TimeKeeper</span>
+        </div>
+
+        <div className="relative z-10">
+          <h1 className="text-4xl font-heading font-bold text-sidebar-foreground leading-tight mb-4">
+            Track time.<br />
+            <span className="text-primary">Work smarter.</span>
+          </h1>
+          <p className="text-sidebar-muted text-base leading-relaxed mb-10 max-w-sm">
+            The modern time-tracking platform built for teams who value simplicity, visibility, and control.
+          </p>
+
+          <div className="space-y-5">
+            {features.map(({ Icon, label, desc }) => (
+              <div key={label} className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-md bg-white/10 flex items-center justify-center text-sidebar-foreground flex-shrink-0">
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <p className="text-sidebar-foreground font-heading font-medium text-sm">{label}</p>
+                  <p className="text-sidebar-muted text-xs mt-0.5">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-sidebar-muted/50 text-xs relative z-10">&copy; 2026 TimeKeeper. All rights reserved.</p>
+      </div>
+
+      {/* Right panel - form */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+        <div className="w-full max-w-[400px]">
+
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
+              <Clock size={18} className="text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">TimeKeeper</h1>
-              <p className="text-xs text-gray-500">Time Tracking Platform</p>
-            </div>
+            <span className="font-heading font-semibold text-foreground text-lg">TimeKeeper</span>
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-          <p className="text-gray-500 text-sm mb-6">Sign in to your account</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label">Email</label>
-              <input
-                type="email"
-                className="input"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
+          <div className="card">
+            <div className="mb-6">
+              <h2 className="text-2xl font-heading font-bold text-foreground tracking-tight">Welcome back</h2>
+              <p className="text-muted-foreground text-sm mt-1">Sign in to your account to continue</p>
             </div>
-            <div>
-              <label className="label">Password</label>
-              <div className="relative">
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="label">Email address</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  className="input pr-10"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  type="email" className="input" placeholder="you@company.com"
+                  value={email} onChange={(e) => setEmail(e.target.value)}
+                  required autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600"
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </div>
+
+              <div>
+                <label className="label">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="input pr-11" placeholder="••••••••"
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button" onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="btn-primary w-full animate-submit-glow" disabled={loading}>
+                {loading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
+                    Signing in...
+                  </>
+                ) : 'Sign in'}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-5 border-t border-border">
+              <p className="text-[11px] font-heading font-medium text-muted-foreground uppercase tracking-wider mb-3">Demo accounts - click to fill</p>
+              <div className="space-y-1">
+                {demoAccounts.map(({ role, email: e, password: p }) => (
+                  <button
+                    key={role} type="button"
+                    onClick={() => { setEmail(e); setPassword(p) }}
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors group flex items-center justify-between"
+                  >
+                    <span className="text-xs font-heading font-medium text-foreground group-hover:text-accent-foreground">{role}</span>
+                    <span className="text-xs text-muted-foreground">{e}</span>
+                  </button>
+                ))}
               </div>
             </div>
-            <button
-              type="submit"
-              className="btn-primary w-full py-2.5 mt-2"
-              disabled={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-5 border-t border-gray-100 text-xs text-gray-400 space-y-1">
-            <p><span className="font-medium">Admin:</span> admin@timekeeper.app / Admin123!</p>
-            <p><span className="font-medium">Manager:</span> manager@timekeeper.app / Manager123!</p>
-            <p><span className="font-medium">Employee:</span> john@timekeeper.app / Employee123!</p>
           </div>
         </div>
       </div>
