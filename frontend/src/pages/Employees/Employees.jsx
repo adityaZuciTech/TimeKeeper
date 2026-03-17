@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import toast from 'react-hot-toast'
 import {
   fetchEmployees, createEmployee, updateEmployee, updateEmployeeStatus,
   selectEmployees, selectEmployeesLoading
@@ -41,6 +42,8 @@ export default function Employees() {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'EMPLOYEE', departmentId: '', managerId: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [search, setSearch] = useState('')
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     dispatch(fetchEmployees())
@@ -50,27 +53,33 @@ export default function Employees() {
   const openCreate = () => {
     setEditTarget(null)
     setForm({ name: '', email: '', password: '', role: 'EMPLOYEE', departmentId: '', managerId: '' })
+    setFormError('')
     setShowModal(true)
   }
 
   const openEdit = (emp) => {
     setEditTarget(emp)
     setForm({ name: emp.name, email: emp.email, password: '', role: emp.role, departmentId: emp.departmentId || '', managerId: emp.managerId || '' })
+    setFormError('')
     setShowModal(true)
   }
 
   const handleSave = async () => {
+    setFormError('')
+    setSaving(true)
     try {
       if (editTarget) {
         await dispatch(updateEmployee({ id: editTarget.id, data: { name: form.name, role: form.role, departmentId: form.departmentId, managerId: form.managerId } })).unwrap()
-        toast.success('Employee updated')
+        toast.success('Employee updated successfully')
       } else {
         await dispatch(createEmployee(form)).unwrap()
-        toast.success('Employee created')
+        toast.success('Employee created successfully')
       }
       setShowModal(false)
     } catch (err) {
-      toast.error(err || 'Failed')
+      setFormError(typeof err === 'string' ? err : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -237,9 +246,16 @@ export default function Employees() {
               {managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
+          {formError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {formError}
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
-            <button className="btn-secondary flex-1" onClick={() => setShowModal(false)}>Cancel</button>
-            <button className="btn-primary flex-1" onClick={handleSave}>Save</button>
+            <button className="btn-secondary flex-1" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
+            <button className="btn-primary flex-1" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
       </Modal>

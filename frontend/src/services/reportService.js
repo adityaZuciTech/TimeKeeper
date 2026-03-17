@@ -9,4 +9,6 @@ export const reportService = {
     apiClient.get('/reports/project-effort', { params: { projectId } }),
   getDepartmentUtilization: (weekStartDate) =>
     apiClient.get('/reports/department-utilization', { params: { weekStartDate } }),
+  triggerTimesheetReminders: () =>
+    apiClient.post('/admin/reminders/timesheets'),
 }

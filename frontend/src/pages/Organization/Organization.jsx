@@ -3,6 +3,7 @@ import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
 import { LoadingSpinner, PageHeader, StatCard } from '../../components/ui'
 import { format } from 'date-fns'
+import toast from 'react-hot-toast'
 
 function getCurrentMonday() {
   const today = new Date()
@@ -14,6 +15,7 @@ function getCurrentMonday() {
 export default function Organization() {
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [reminderSending, setReminderSending] = useState(false)
   const weekStart = format(getCurrentMonday(), 'yyyy-MM-dd')
 
   useEffect(() => {
@@ -28,6 +30,18 @@ export default function Organization() {
     load()
   }, [])
 
+  const handleSendReminders = async () => {
+    setReminderSending(true)
+    try {
+      await reportService.triggerTimesheetReminders()
+      toast.success('Timesheet reminders sent to unsubmitted employees')
+    } catch (e) {
+      toast.error('Failed to send reminders')
+    } finally {
+      setReminderSending(false)
+    }
+  }
+
   const totalHours = departments.reduce((acc, d) => acc + Number(d.totalHours || 0), 0)
   const totalEmployees = departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0)
 
@@ -36,6 +50,15 @@ export default function Organization() {
       <PageHeader
         title="Organization Overview"
         subtitle={`Week of ${format(getCurrentMonday(), 'MMM d, yyyy')}`}
+        action={
+          <button
+            className="btn-primary"
+            onClick={handleSendReminders}
+            disabled={reminderSending}
+          >
+            {reminderSending ? 'Sending...' : 'Send Timesheet Reminders'}
+          </button>
+        }
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

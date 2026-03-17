@@ -1,5 +1,6 @@
 package com.timekeeper.repository;
 
+import com.timekeeper.entity.Employee;
 import com.timekeeper.entity.Timesheet;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -25,4 +26,19 @@ public interface TimesheetRepository extends JpaRepository<Timesheet, String> {
                                                           @Param("weekStartDate") LocalDate weekStartDate);
 
     List<Timesheet> findByEmployeeId(String employeeId);
+
+    /**
+     * Returns all active employees who do NOT have a SUBMITTED or APPROVED timesheet
+     * for the given week start date.
+     */
+    @Query("""
+            SELECT e FROM Employee e
+            WHERE e.status = 'ACTIVE'
+            AND e.id NOT IN (
+                SELECT t.employee.id FROM Timesheet t
+                WHERE t.weekStartDate = :weekStart
+                AND t.status IN ('SUBMITTED', 'APPROVED')
+            )
+            """)
+    List<Employee> findEmployeesWithoutSubmittedTimesheetForWeek(@Param("weekStart") LocalDate weekStart);
 }
