@@ -29,6 +29,8 @@ public class TimesheetService {
     private final TimeEntryRepository timeEntryRepository;
     private final EmployeeRepository employeeRepository;
     private final ProjectRepository projectRepository;
+    private final LeaveRepository leaveRepository;
+    private final HolidayRepository holidayRepository;
 
     @Transactional
     public TimesheetResponse createOrGetForWeek(String employeeId, CreateTimesheetRequest request) {
@@ -112,6 +114,17 @@ public class TimesheetService {
         }
         if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
             throw new BusinessException("Cannot modify a submitted timesheet");
+        }
+
+        // Block entries on holidays or approved leave days
+        LocalDate dayDate = timesheet.getWeekStartDate().plusDays(request.getDay().ordinal());
+        List<Holiday> holidaysOnDay = holidayRepository.findByDateBetween(dayDate, dayDate);
+        if (!holidaysOnDay.isEmpty()) {
+            throw new BusinessException("Cannot log time on a company holiday: " + holidaysOnDay.get(0).getName());
+        }
+        List<Leave> leavesOnDay = leaveRepository.findApprovedLeavesForWeek(employeeId, dayDate, dayDate);
+        if (!leavesOnDay.isEmpty()) {
+            throw new BusinessException("Cannot log time on an approved leave day");
         }
 
         TimeEntry entry = new TimeEntry();
@@ -278,9 +291,22 @@ public class TimesheetService {
         return date.with(DayOfWeek.MONDAY);
     }
 
-    // Build the full detail response with days and entries
+    // Build the full detail response with days and entries, overlaying leave/holiday awareness
     public TimesheetResponse toDetailResponse(Timesheet timesheet) {
         List<TimeEntry> allEntries = timeEntryRepository.findByTimesheetId(timesheet.getId());
+        boolean isSubmitted = timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED;
+
+        // Pre-fetch holidays and approved leaves for this week (Mon–Fri)
+        LocalDate weekStart = timesheet.getWeekStartDate();
+        LocalDate weekEnd   = weekStart.plusDays(4);
+        List<Holiday> weekHolidays = holidayRepository.findByDateBetweenOrderByDateAsc(weekStart, weekEnd);
+        Set<LocalDate> holidayDates = weekHolidays.stream()
+                .map(Holiday::getDate).collect(Collectors.toSet());
+        Map<LocalDate, Holiday> holidayMap = weekHolidays.stream()
+                .collect(Collectors.toMap(Holiday::getDate, h -> h));
+
+        List<Leave> weekLeaves = leaveRepository.findApprovedLeavesForWeek(
+                timesheet.getEmployee().getId(), weekStart, weekEnd);
 
         Map<TimeEntry.DayOfWeek, List<TimeEntry>> byDay = new LinkedHashMap<>();
         for (TimeEntry.DayOfWeek day : TimeEntry.DayOfWeek.values()) {
@@ -292,17 +318,39 @@ public class TimesheetService {
 
         List<TimesheetResponse.DayResponse> days = new ArrayList<>();
         BigDecimal totalHours = BigDecimal.ZERO;
+        int dayIndex = 0;
 
         for (Map.Entry<TimeEntry.DayOfWeek, List<TimeEntry>> dayEntry : byDay.entrySet()) {
+            LocalDate dayDate = weekStart.plusDays(dayIndex++);
             List<TimeEntry> dayEntries = dayEntry.getValue();
             BigDecimal dayHours = BigDecimal.ZERO;
-            String dayStatus = "WORK";
 
-            if (!dayEntries.isEmpty()) {
-                TimeEntry first = dayEntries.get(0);
-                if (first.getEntryType() == TimeEntry.EntryType.LEAVE) dayStatus = "LEAVE";
-                else if (first.getEntryType() == TimeEntry.EntryType.HOLIDAY) dayStatus = "HOLIDAY";
+            // Priority: HOLIDAY > LEAVE > WORK (from entries)
+            String dayStatus = "WORK";
+            String leaveType = null;
+            String leaveId   = null;
+
+            if (holidayDates.contains(dayDate)) {
+                dayStatus = "HOLIDAY";
+            } else {
+                // Check approved leave coverage
+                for (Leave leave : weekLeaves) {
+                    if (!dayDate.isBefore(leave.getStartDate()) && !dayDate.isAfter(leave.getEndDate())) {
+                        dayStatus = "LEAVE";
+                        leaveType = leave.getLeaveType().name();
+                        leaveId   = leave.getId();
+                        break;
+                    }
+                }
+                // Fallback: check time-entry-based leave/holiday markers if present
+                if (dayStatus.equals("WORK") && !dayEntries.isEmpty()) {
+                    TimeEntry first = dayEntries.get(0);
+                    if (first.getEntryType() == TimeEntry.EntryType.LEAVE) dayStatus = "LEAVE";
+                    else if (first.getEntryType() == TimeEntry.EntryType.HOLIDAY) dayStatus = "HOLIDAY";
+                }
             }
+
+            boolean editable = !isSubmitted && dayStatus.equals("WORK");
 
             for (TimeEntry e : dayEntries) {
                 if (e.getHoursLogged() != null) dayHours = dayHours.add(e.getHoursLogged());
@@ -317,6 +365,9 @@ public class TimesheetService {
                     .day(dayEntry.getKey().name())
                     .totalHours(dayHours)
                     .dayStatus(dayStatus)
+                    .leaveType(leaveType)
+                    .leaveId(leaveId)
+                    .editable(editable)
                     .entries(entryResponses)
                     .build());
         }

@@ -4,6 +4,8 @@ import employeeReducer from '../features/employees/employeeSlice'
 import projectReducer from '../features/projects/projectSlice'
 import timesheetReducer from '../features/timesheets/timesheetSlice'
 import departmentReducer from '../features/departments/departmentSlice'
+import leaveReducer from '../features/leaves/leaveSlice'
+import holidayReducer from '../features/holidays/holidaySlice'
 
 export const store = configureStore({
   reducer: {
@@ -12,5 +14,7 @@ export const store = configureStore({
     projects: projectReducer,
     timesheets: timesheetReducer,
     departments: departmentReducer,
+    leaves: leaveReducer,
+    holidays: holidayReducer,
   },
 })

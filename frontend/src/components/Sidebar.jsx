@@ -5,19 +5,25 @@ import { logout, selectCurrentUser } from '../features/auth/authSlice'
 import {
   LayoutDashboard, Clock, Users, UserCheck, Building2,
   FolderKanban, BarChart2, User, LogOut, Menu, X, ChevronRight, ChevronsLeft,
+  CalendarOff, CalendarDays,
 } from 'lucide-react'
 
 const navItems = {
   EMPLOYEE: [
     { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
     { path: '/timesheets', label: 'Timesheets', Icon: Clock },
+    { path: '/leaves/my', label: 'My Leaves',   Icon: CalendarOff },
+    { path: '/holidays',   label: 'Holidays',   Icon: CalendarDays },
     { path: '/profile',    label: 'Profile',    Icon: User },
   ],
   MANAGER: [
-    { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
-    { path: '/timesheets', label: 'Timesheets', Icon: Clock },
-    { path: '/team',       label: 'My Team',    Icon: UserCheck },
-    { path: '/profile',    label: 'Profile',    Icon: User },
+    { path: '/dashboard',  label: 'Dashboard',   Icon: LayoutDashboard },
+    { path: '/timesheets', label: 'Timesheets',  Icon: Clock },
+    { path: '/team',       label: 'My Team',     Icon: UserCheck },
+    { path: '/leaves/my',  label: 'My Leaves',   Icon: CalendarOff },
+    { path: '/leaves/team',label: 'Team Leaves', Icon: Users },
+    { path: '/holidays',   label: 'Holidays',    Icon: CalendarDays },
+    { path: '/profile',    label: 'Profile',     Icon: User },
   ],
   ADMIN: [
     { path: '/dashboard',    label: 'Dashboard',   Icon: LayoutDashboard },
@@ -25,6 +31,9 @@ const navItems = {
     { path: '/employees',    label: 'Employees',   Icon: Users },
     { path: '/departments',  label: 'Departments', Icon: Building2 },
     { path: '/projects',     label: 'Projects',    Icon: FolderKanban },
+    { path: '/leaves/my',    label: 'My Leaves',   Icon: CalendarOff },
+    { path: '/leaves/team',  label: 'Team Leaves', Icon: UserCheck },
+    { path: '/holidays',     label: 'Holidays',    Icon: CalendarDays },
     { path: '/organization', label: 'Reports',     Icon: BarChart2 },
     { path: '/profile',      label: 'Profile',     Icon: User },
   ],

@@ -16,6 +16,9 @@ import Departments from './pages/Departments/Departments'
 import Projects from './pages/Projects/Projects'
 import Organization from './pages/Organization/Organization'
 import Profile from './pages/Profile/Profile'
+import MyLeaves from './pages/Leaves/MyLeaves'
+import TeamLeaves from './pages/Leaves/TeamLeaves'
+import Holidays from './pages/Holidays/Holidays'
 
 function RootRedirect() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
@@ -39,12 +42,15 @@ export default function App() {
           <Route path="/timesheets/new" element={<NewTimesheet />} />
           <Route path="/timesheets/:id" element={<TimesheetDetail />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/leaves/my" element={<MyLeaves />} />
+          <Route path="/holidays" element={<Holidays />} />
         </Route>
 
         {/* Manager + Admin */}
         <Route element={<ProtectedRoute roles={['MANAGER', 'ADMIN']} />}>
           <Route path="/team" element={<Team />} />
           <Route path="/team/:employeeId/timesheets" element={<TeamMemberTimesheets />} />
+          <Route path="/leaves/team" element={<TeamLeaves />} />
         </Route>
 
         {/* Admin only */}

@@ -58,7 +58,12 @@ export default function TimesheetDetail() {
   }, [error, dispatch])
 
   const isSubmitted = timesheet?.status === 'SUBMITTED'
-  const isEditable = (day) => !isSubmitted && !isFutureDay(timesheet?.weekStartDate, day)
+  // Use backend-provided editable flag when present; fall back to future-day guard
+  const isEditable = (day) => {
+    const dayData = getDayData(day)
+    if (dayData && typeof dayData.editable === 'boolean') return dayData.editable
+    return !isSubmitted && !isFutureDay(timesheet?.weekStartDate, day)
+  }
 
   const openAddModal = (day) => {
     setEditEntry(null)
@@ -167,18 +172,36 @@ export default function TimesheetDetail() {
           const entries = dayData?.entries || []
           const totalHours = Number(dayData?.totalHours || 0)
           const dayStatus = dayData?.dayStatus || 'WORK'
+          const leaveType = dayData?.leaveType
+
+          // Color scheme per day type
+          const dayHeaderClass = {
+            WORK:    'bg-muted/50 border-b border-border',
+            LEAVE:   'bg-amber-50 border-b border-amber-200',
+            HOLIDAY: 'bg-blue-50 border-b border-blue-200',
+          }[dayStatus] || 'bg-muted/50 border-b border-border'
+
+          const dayTypeBadge = {
+            LEAVE:   'bg-amber-100 text-amber-700 border border-amber-200',
+            HOLIDAY: 'bg-blue-100 text-blue-700 border border-blue-200',
+          }[dayStatus]
+
+          const dayDot = {
+            WORK:    'bg-emerald-400',
+            LEAVE:   'bg-amber-400',
+            HOLIDAY: 'bg-blue-500',
+          }[dayStatus] || 'bg-emerald-400'
 
           return (
             <div key={day} className="card p-0 overflow-hidden">
               {/* Day header */}
-              <div className={`flex items-center justify-between px-5 py-3.5 ${
-                dayStatus !== 'WORK' ? 'bg-warning/10 border-b border-warning/20' : 'bg-muted/50 border-b border-border'
-              }`}>
+              <div className={`flex items-center justify-between px-5 py-3.5 ${dayHeaderClass}`}>
                 <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dayDot}`} title={dayStatus} />
                   <span className="font-heading font-semibold text-foreground text-sm capitalize">{day.charAt(0) + day.slice(1).toLowerCase()}</span>
                   {dayStatus !== 'WORK' && (
-                    <span className="text-xs bg-warning/15 text-warning-foreground border border-warning/20 px-2 py-0.5 rounded-full font-heading font-medium">
-                      {dayStatus}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-heading font-medium ${dayTypeBadge}`}>
+                      {dayStatus}{leaveType ? ` · ${leaveType}` : ''}
                     </span>
                   )}
                 </div>
@@ -197,8 +220,16 @@ export default function TimesheetDetail() {
               </div>
 
               {entries.length === 0 ? (
-                <div className="px-5 py-4 text-sm text-gray-400 italic">
-                  {isEditable(day) ? 'No entries yet - click Add to log time.' : 'No entries.'}
+                <div className="px-5 py-4 text-sm italic">
+                  {dayStatus === 'HOLIDAY' ? (
+                    <span className="text-blue-500">Company holiday — no time logging required.</span>
+                  ) : dayStatus === 'LEAVE' ? (
+                    <span className="text-amber-500">On {leaveType ? leaveType.charAt(0) + leaveType.slice(1).toLowerCase() : ''} leave — no time logging required.</span>
+                  ) : isEditable(day) ? (
+                    <span className="text-gray-400">No entries yet — click Add to log time.</span>
+                  ) : (
+                    <span className="text-gray-400">No entries.</span>
+                  )}
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50">

@@ -23,7 +23,10 @@ public class TimesheetResponse {
     public static class DayResponse {
         private String day;
         private BigDecimal totalHours;
-        private String dayStatus; // WORK, LEAVE, HOLIDAY
+        private String dayStatus;   // WORK | LEAVE | HOLIDAY
+        private String leaveType;   // SICK | CASUAL | VACATION (populated when dayStatus=LEAVE)
+        private String leaveId;     // ID of the Leave record (populated when dayStatus=LEAVE)
+        private boolean editable;   // false when HOLIDAY, LEAVE, or timesheet is SUBMITTED
         private List<TimeEntryResponse> entries;
     }
 }
