@@ -1,189 +1,277 @@
 ﻿import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import { logout, selectCurrentUser } from '../features/auth/authSlice'
+import { NavLink } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+import { selectCurrentUser } from '../features/auth/authSlice'
 import {
   LayoutDashboard, Clock, Users, UserCheck, Building2,
-  FolderKanban, BarChart2, User, LogOut, Menu, X, ChevronRight, ChevronsLeft,
+  FolderKanban, BarChart2, User, Menu, X, ChevronRight, ChevronsLeft, ChevronsRight,
   CalendarOff, CalendarDays,
 } from 'lucide-react'
 
-const navItems = {
+// Each role's nav is split into labelled sections.
+// Set `collapsible: true` on a section to make it toggleable (default expanded).
+const navGroups = {
   EMPLOYEE: [
-    { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
-    { path: '/timesheets', label: 'Timesheets', Icon: Clock },
-    { path: '/leaves/my', label: 'My Leaves',   Icon: CalendarOff },
-    { path: '/holidays',   label: 'Holidays',   Icon: CalendarDays },
-    { path: '/profile',    label: 'Profile',    Icon: User },
+    {
+      section: 'OVERVIEW',
+      items: [
+        { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
+      ],
+    },
+    {
+      section: 'WORK',
+      items: [
+        { path: '/timesheets', label: 'Timesheets', Icon: Clock },
+        { path: '/leaves/my',  label: 'My Leaves',  Icon: CalendarOff },
+        { path: '/holidays',   label: 'Holidays',   Icon: CalendarDays },
+      ],
+    },
+    {
+      section: 'ACCOUNT',
+      items: [
+        { path: '/profile', label: 'Profile', Icon: User },
+      ],
+    },
   ],
   MANAGER: [
-    { path: '/dashboard',  label: 'Dashboard',   Icon: LayoutDashboard },
-    { path: '/timesheets', label: 'Timesheets',  Icon: Clock },
-    { path: '/team',       label: 'My Team',     Icon: UserCheck },
-    { path: '/leaves/my',  label: 'My Leaves',   Icon: CalendarOff },
-    { path: '/leaves/team',label: 'Team Leaves', Icon: Users },
-    { path: '/holidays',   label: 'Holidays',    Icon: CalendarDays },
-    { path: '/profile',    label: 'Profile',     Icon: User },
+    {
+      section: 'OVERVIEW',
+      items: [
+        { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
+      ],
+    },
+    {
+      section: 'WORK',
+      items: [
+        { path: '/timesheets',  label: 'Timesheets',  Icon: Clock },
+        { path: '/team',        label: 'My Team',     Icon: UserCheck },
+        { path: '/leaves/my',   label: 'My Leaves',   Icon: CalendarOff },
+        { path: '/leaves/team', label: 'Team Leaves', Icon: Users },
+        { path: '/holidays',    label: 'Holidays',    Icon: CalendarDays },
+      ],
+    },
+    {
+      section: 'ACCOUNT',
+      items: [
+        { path: '/profile', label: 'Profile', Icon: User },
+      ],
+    },
   ],
   ADMIN: [
-    { path: '/dashboard',    label: 'Dashboard',   Icon: LayoutDashboard },
-    { path: '/timesheets',   label: 'Timesheets',  Icon: Clock },
-    { path: '/employees',    label: 'Employees',   Icon: Users },
-    { path: '/departments',  label: 'Departments', Icon: Building2 },
-    { path: '/projects',     label: 'Projects',    Icon: FolderKanban },
-    { path: '/leaves/my',    label: 'My Leaves',   Icon: CalendarOff },
-    { path: '/leaves/team',  label: 'Team Leaves', Icon: UserCheck },
-    { path: '/holidays',     label: 'Holidays',    Icon: CalendarDays },
-    { path: '/organization', label: 'Reports',     Icon: BarChart2 },
-    { path: '/profile',      label: 'Profile',     Icon: User },
+    {
+      section: 'OVERVIEW',
+      items: [
+        { path: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard },
+      ],
+    },
+    {
+      section: 'WORK',
+      items: [
+        { path: '/timesheets',  label: 'Timesheets',  Icon: Clock },
+        { path: '/leaves/my',   label: 'My Leaves',   Icon: CalendarOff },
+        { path: '/leaves/team', label: 'Team Leaves', Icon: UserCheck },
+      ],
+    },
+    {
+      section: 'ORGANIZATION',
+      collapsible: true,
+      items: [
+        { path: '/employees',   label: 'Employees',   Icon: Users },
+        { path: '/departments', label: 'Departments', Icon: Building2 },
+        { path: '/projects',    label: 'Projects',    Icon: FolderKanban },
+      ],
+    },
+    {
+      section: 'INSIGHTS',
+      items: [
+        { path: '/organization', label: 'Reports', Icon: BarChart2 },
+      ],
+    },
+    {
+      section: 'ADMINISTRATION',
+      items: [
+        { path: '/holidays', label: 'Holidays', Icon: CalendarDays },
+      ],
+    },
+    {
+      section: 'ACCOUNT',
+      items: [
+        { path: '/profile', label: 'Profile', Icon: User },
+      ],
+    },
   ],
 }
 
-function SidebarContent({ user, items, onLogout, collapsed = false, onToggleCollapse }) {
-  const initials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : '??'
+function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
+  // Track which collapsible sections are toggled shut (default: all expanded)
+  const [closedSections, setClosedSections] = useState({})
+
+  const toggleSection = (section) =>
+    setClosedSections((prev) => ({ ...prev, [section]: !prev[section] }))
+
+  // Flat item list used in collapsed (icon-only) mode
+  const allItems = groups.flatMap((g) => g.items)
 
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`h-[72px] flex items-center border-b border-slate-700 flex-shrink-0 ${collapsed ? 'justify-center px-3' : 'px-5'}`}>
+      <div className={`h-[72px] flex items-center border-b border-slate-700 flex-shrink-0 ${collapsed ? 'justify-center px-3' : 'px-4'}`}>
         {collapsed ? (
-          /* In collapsed mode the logo icon doubles as the expand button */
-          <button
-            onClick={onToggleCollapse}
-            className="w-9 h-9 bg-primary rounded-md flex items-center justify-center flex-shrink-0 hover:opacity-90 transition-opacity"
-            title="Expand sidebar"
-          >
-            <Clock size={18} className="text-primary-foreground" />
-          </button>
+          <div className="flex flex-col items-center gap-0.5">
+            <NavLink
+              to="/dashboard"
+              className="w-9 h-9 bg-primary rounded-md flex items-center justify-center hover:opacity-90 transition-opacity"
+            >
+              <Clock size={18} className="text-primary-foreground" />
+            </NavLink>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-700/60 transition-all duration-200"
+              title="Expand sidebar"
+            >
+              <ChevronsRight size={12} />
+            </button>
+          </div>
         ) : (
-          <>
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-2.5 w-full">
+            <NavLink to="/dashboard" className="flex items-center gap-2.5 flex-1 min-w-0 group/logo">
+              <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center flex-shrink-0 group-hover/logo:opacity-90 transition-opacity">
                 <Clock size={18} className="text-primary-foreground" />
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-heading font-semibold text-white text-[15px] tracking-tight leading-tight">
-                  TimeKeeper
-                </span>
-              </div>
-            </div>
+              <span className="font-heading font-semibold text-white text-[15px] tracking-tight leading-tight truncate">
+                TimeKeeper
+              </span>
+            </NavLink>
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="ml-2 p-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-200 flex-shrink-0"
+                className="ml-auto p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all duration-200 flex-shrink-0"
                 title="Collapse sidebar"
               >
                 <ChevronsLeft size={16} />
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-5 px-2 space-y-1 sidebar-scroll overflow-y-auto">
-        {items.map(({ path, label, Icon }) =>
-          collapsed ? (
-            /* Collapsed: icon-only + custom tooltip. NavLink never touches collapsed state. */
-            <div key={path} className="relative group">
-              <NavLink
-                to={path}
-                className={({ isActive }) =>
-                  `flex justify-center p-2.5 rounded-md text-sm transition-all duration-200 ${
-                    isActive
-                      ? 'bg-slate-700 text-white'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <Icon size={18} className={isActive ? 'text-primary' : 'text-slate-300 group-hover:text-white'} />
-                )}
-              </NavLink>
-              {/* Tooltip */}
-              <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 rounded-md bg-gray-900 text-white text-xs whitespace-nowrap shadow-md z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                {label}
-              </span>
-            </div>
-          ) : (
-            /* Expanded: icon + label with left accent indicator */
-            <NavLink
-              key={path}
-              to={path}
-              className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-200 group border-l-2 ${
-                  isActive
-                    ? 'bg-slate-700 text-white font-medium border-primary'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-white border-transparent'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon size={18} className={isActive ? 'text-primary' : 'text-slate-300 group-hover:text-white'} />
-                  <span className="flex-1 font-body">{label}</span>
-                  {isActive && <ChevronRight size={14} className="text-primary opacity-70" />}
-                </>
-              )}
-            </NavLink>
-          )
+      <nav className="flex-1 py-4 px-2 sidebar-scroll overflow-y-auto">
+        {collapsed ? (
+          /* ── Collapsed: flat icon-only list with tooltips ── */
+          <div className="space-y-1">
+            {allItems.map(({ path, label, Icon }) => (
+              <div key={path} className="relative group/nav">
+                <NavLink
+                  to={path}
+                  className={({ isActive }) =>
+                    `flex justify-center p-2.5 rounded-md transition-all duration-200 ${
+                      isActive
+                        ? 'bg-slate-700 text-white'
+                        : 'text-slate-300 hover:bg-slate-700/70 hover:text-white'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <Icon size={18} className={`transition-colors ${
+                      isActive ? 'text-primary' : 'text-slate-400 group-hover/nav:text-white'
+                    }`} />
+                  )}
+                </NavLink>
+                {/* Tooltip — slide-in from left */}
+                <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-medium whitespace-nowrap shadow-lg z-50 opacity-0 -translate-x-1 group-hover/nav:opacity-100 group-hover/nav:translate-x-0 transition-all duration-150 ease-out">
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* ── Expanded: sectioned groups ── */
+          <div className="space-y-5">
+            {groups.map(({ section, items, collapsible }) => {
+              const isClosed = closedSections[section]
+              return (
+                <div key={section}>
+                  {/* Section header */}
+                  <div
+                    role={collapsible ? 'button' : undefined}
+                    tabIndex={collapsible ? 0 : undefined}
+                    onClick={collapsible ? () => toggleSection(section) : undefined}
+                    onKeyDown={collapsible ? (e) => e.key === 'Enter' && toggleSection(section) : undefined}
+                    className={`flex items-center justify-between px-3 mb-1.5 ${
+                      collapsible ? 'cursor-pointer group/sh select-none' : 'cursor-default'
+                    }`}
+                  >
+                    <span className="text-[10px] font-heading font-semibold uppercase tracking-widest text-slate-500 group-hover/sh:text-slate-300 transition-colors">
+                      {section}
+                    </span>
+                    {collapsible && (
+                      <ChevronRight
+                        size={11}
+                        className={`text-slate-500 group-hover/sh:text-slate-300 transition-all duration-200 ${
+                          isClosed ? '' : 'rotate-90'
+                        }`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Items (hidden when section is collapsed) */}
+                  {!isClosed && (
+                    <div className="space-y-0.5">
+                      {items.map(({ path, label, Icon }) => (
+                        <NavLink
+                          key={path}
+                          to={path}
+                          className={({ isActive }) =>
+                            `w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-all duration-200 group border-l-2 ${
+                              isActive
+                                ? 'bg-slate-700 text-white font-medium border-primary'
+                                : 'text-slate-300 hover:bg-slate-700/60 hover:text-white border-transparent'
+                            }`
+                          }
+                        >
+                          {({ isActive }) => (
+                            <>
+                              <Icon
+                                size={16}
+                                className={`flex-shrink-0 transition-colors ${
+                                  isActive ? 'text-primary' : 'text-slate-400 group-hover:text-white'
+                                }`}
+                              />
+                              <span className="flex-1 font-body">{label}</span>
+                              {isActive && <ChevronRight size={12} className="text-primary opacity-60" />}
+                            </>
+                          )}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         )}
       </nav>
 
-      {/* User footer */}
-      <div className="flex-shrink-0 border-t border-slate-700 px-2 py-3">
-        {collapsed ? (
-          <div className="relative group flex justify-center">
-            <div className="relative p-2 rounded-md hover:bg-slate-700 transition-all duration-200 cursor-default">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-xs font-heading font-bold text-primary-foreground">{initials}</span>
-              </div>
-              <span className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-slate-800" />
-            </div>
-            <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 rounded-md bg-gray-900 text-white text-xs whitespace-nowrap shadow-md z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              {user?.name}
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-slate-700 transition-all duration-200 cursor-default">
-            <div className="relative flex-shrink-0">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-xs font-heading font-bold text-primary-foreground">{initials}</span>
-              </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-slate-800" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-heading font-medium text-white truncate">{user?.name}</p>
-              <p className="text-[11px] text-slate-300 truncate capitalize">{user?.role?.toLowerCase()}</p>
-            </div>
-            <button
-              onClick={onLogout}
-              title="Sign out"
-              className="p-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors flex-shrink-0"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
 
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true' } catch { return false }
+  })
   const user = useSelector(selectCurrentUser)
 
-  const items = navItems[user?.role] ?? navItems.EMPLOYEE
+  const groups = navGroups[user?.role] ?? navGroups.EMPLOYEE
 
-  const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login', { replace: true })
+  const handleToggleCollapse = () => {
+    setCollapsed((v) => {
+      const next = !v
+      try { localStorage.setItem('sidebar-collapsed', String(next)) } catch {}
+      return next
+    })
   }
 
   return (
@@ -192,10 +280,9 @@ export default function Sidebar() {
       <aside className={`hidden lg:flex flex-col h-screen bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'}`}>
         <SidebarContent
           user={user}
-          items={items}
-          onLogout={handleLogout}
+          groups={groups}
           collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((v) => !v)}
+          onToggleCollapse={handleToggleCollapse}
         />
       </aside>
 
@@ -230,8 +317,7 @@ export default function Sidebar() {
             </button>
             <SidebarContent
               user={user}
-              items={items}
-              onLogout={handleLogout}
+              groups={groups}
               collapsed={true}
             />
           </div>
