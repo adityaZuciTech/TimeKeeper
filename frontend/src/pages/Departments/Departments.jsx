@@ -8,7 +8,7 @@ import { selectEmployees, fetchEmployees } from '../../features/employees/employ
 import { departmentService } from '../../services/departmentService'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import Modal from '../../components/Modal'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -629,13 +629,22 @@ export default function Departments() {
 
         {/* ── Grid ────────────────────────────────────────────────────────── */}
         {loading ? (
-          <LoadingSpinner />
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground">
-            <Building2 size={36} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">{search ? 'No departments match your search' : 'No departments yet'}</p>
-            {!search && <button onClick={openCreate} className="btn-primary mt-4 text-sm">Create first department</button>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[1,2,3,4,5,6].map(i => <div key={i} className="h-52 bg-card rounded-2xl border border-border animate-pulse" />)}
           </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title={search || statusTab !== 'ALL' || sizeFilter !== 'ALL' ? 'No departments match your filters' : 'No departments yet'}
+            description={search || statusTab !== 'ALL' || sizeFilter !== 'ALL'
+              ? 'Try adjusting your search or filter criteria.'
+              : 'Create your first department to start organizing your team.'}
+            action={
+              search || statusTab !== 'ALL' || sizeFilter !== 'ALL'
+                ? <button onClick={() => { setSearch(''); setStatusTab('ALL'); setSizeFilter('ALL') }} className="btn-ghost text-sm">Clear filters</button>
+                : <button onClick={openCreate} className="btn-primary text-sm"><Plus size={14} /> Create first department</button>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map(dept => (

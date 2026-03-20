@@ -8,7 +8,7 @@ import {
 import { fetchProjects, selectActiveProjects } from '../../features/projects/projectSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { StatusBadge, LoadingSpinner } from '../../components/ui'
+import { StatusBadge, LoadingSpinner, ConfirmDialog, FieldError } from '../../components/ui'
 import { format, parseISO, isAfter, startOfDay } from 'date-fns'
 import toast from 'react-hot-toast'
 
@@ -312,7 +312,7 @@ function EntryDrawer({
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 {errors?.project && (
-                  <p className="text-[11px] text-red-500 mt-1">{errors.project}</p>
+                  <FieldError error={errors.project} />
                 )}
               </div>
 
@@ -348,7 +348,7 @@ function EntryDrawer({
                   ))}
                 </div>
                 {errors?.time && (
-                  <p className="text-[11px] text-red-500 mt-1">{errors.time}</p>
+                  <FieldError error={errors.time} />
                 )}
               </div>
 
@@ -421,6 +421,11 @@ export default function TimesheetDetail() {
   const [formEnd,     setFormEnd]     = useState('17:00')
   const [formDesc,    setFormDesc]    = useState('')
   const [formErrors,  setFormErrors]  = useState({})
+  // Confirmation dialogs — replaces browser confirm() for better UX (heuristic #3 & #5)
+  const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null) // holds entryId to delete
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     dispatch(fetchTimesheetById(id))
@@ -502,23 +507,35 @@ export default function TimesheetDetail() {
     }
   }
 
-  const handleDelete = async (entryId) => {
-    if (!confirm('Delete this entry?')) return
+  const handleDelete = (entryId) => {
+    setConfirmDelete(entryId)
+  }
+
+  const doDelete = async () => {
+    setDeleteLoading(true)
     try {
-      await dispatch(deleteEntry({ timesheetId: id, entryId })).unwrap()
+      await dispatch(deleteEntry({ timesheetId: id, entryId: confirmDelete })).unwrap()
       toast.success('Entry deleted')
+      setConfirmDelete(null)
     } catch (err) {
       toast.error(err || 'Failed to delete entry')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
-  const handleSubmit = async () => {
-    if (!confirm('Submit this timesheet? It will become read-only.')) return
+  const handleSubmit = () => setConfirmSubmit(true)
+
+  const doSubmit = async () => {
+    setSubmitLoading(true)
     try {
       await dispatch(submitTimesheet(id)).unwrap()
-      toast.success('Timesheet submitted!')
+      toast.success('Timesheet submitted successfully!')
+      setConfirmSubmit(false)
     } catch (err) {
       toast.error(err || 'Failed to submit')
+    } finally {
+      setSubmitLoading(false)
     }
   }
 
@@ -698,6 +715,32 @@ export default function TimesheetDetail() {
         setFormStart={setFormStart} setFormEnd={setFormEnd}       setFormDesc={setFormDesc}
         onSave={handleSave}
         errors={formErrors}
+      />
+
+      {/* ── Submit confirmation ───────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmSubmit}
+        title="Submit this timesheet?"
+        description="Once submitted, you won't be able to make changes. Your manager will review it."
+        confirmLabel="Submit"
+        cancelLabel="Not yet"
+        variant="primary"
+        loading={submitLoading}
+        onConfirm={doSubmit}
+        onCancel={() => setConfirmSubmit(false)}
+      />
+
+      {/* ── Delete confirmation ───────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete this entry?"
+        description="This action cannot be undone. The time entry will be permanently removed."
+        confirmLabel="Delete"
+        cancelLabel="Keep it"
+        variant="danger"
+        loading={deleteLoading}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDelete(null)}
       />
     </Layout>
   )

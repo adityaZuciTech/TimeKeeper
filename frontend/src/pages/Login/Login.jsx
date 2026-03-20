@@ -2,8 +2,7 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { login, selectIsAuthenticated, selectAuthError, selectAuthLoading, clearError } from '../../features/auth/authSlice'
-import toast from 'react-hot-toast'
-import { Clock, Eye, EyeOff, BarChart2, Users, Timer } from 'lucide-react'
+import { Clock, Eye, EyeOff, BarChart2, Users, Timer, AlertCircle } from 'lucide-react'
 
 const features = [
   { Icon: Timer,    label: 'Track time across projects',    desc: 'Log work hours with precision across multiple projects' },
@@ -21,6 +20,7 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [inlineError, setInlineError] = useState('')
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
@@ -32,14 +32,21 @@ export default function Login() {
     if (isAuthenticated) navigate('/dashboard', { replace: true })
   }, [isAuthenticated, navigate])
 
+  // Show error inline instead of (only) as a disappearing toast
   useEffect(() => {
-    if (error) { toast.error(error); dispatch(clearError()) }
+    if (error) {
+      setInlineError(error)
+      dispatch(clearError())
+    }
   }, [error, dispatch])
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setInlineError('')
     dispatch(login({ email, password }))
   }
+
+  const fillDemo = (e, p) => { setEmail(e); setPassword(p); setInlineError('') }
 
   return (
     <div className="min-h-screen flex">
@@ -142,6 +149,14 @@ export default function Login() {
                   </>
                 ) : 'Sign in'}
               </button>
+
+              {/* Inline error — persists until user retries (heuristic #9) */}
+              {inlineError && (
+                <div className="flex items-start gap-2.5 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                  <AlertCircle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-600 leading-snug">{inlineError}</p>
+                </div>
+              )}
             </form>
 
             <div className="mt-6 pt-5 border-t border-border">
@@ -150,7 +165,7 @@ export default function Login() {
                 {demoAccounts.map(({ role, email: e, password: p }) => (
                   <button
                     key={role} type="button"
-                    onClick={() => { setEmail(e); setPassword(p) }}
+                    onClick={() => fillDemo(e, p)}
                     className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors group flex items-center justify-between"
                   >
                     <span className="text-xs font-heading font-medium text-foreground group-hover:text-accent-foreground">{role}</span>

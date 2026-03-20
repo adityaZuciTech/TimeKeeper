@@ -5,7 +5,7 @@ import { fetchTeam, selectTeam } from '../../features/employees/employeeSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import { format } from 'date-fns'
 import {
   Users, TrendingUp, AlertTriangle, Clock,
@@ -253,7 +253,11 @@ export default function Team() {
         </div>
       </div>
 
-      {loading ? <LoadingSpinner /> : (
+      {loading ? (
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <SkeletonRows rows={5} cols={3} />
+        </div>
+      ) : (
         <>
           {/* stat strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -336,16 +340,21 @@ export default function Team() {
 
           {/* grid */}
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-              <Users size={32} className="text-muted-foreground/30" />
-              <p className="font-heading font-semibold text-foreground">No members match your filters</p>
-              <button
-                onClick={() => { setSearch(''); setDeptFilter('ALL'); setStatusFilter('ALL') }}
-                className="text-sm text-primary hover:underline"
-              >
-                Clear filters
-              </button>
-            </div>
+            <EmptyState
+              icon={Users}
+              title={enriched.length === 0 ? 'No team members yet' : 'No members match your filters'}
+              description={enriched.length === 0
+                ? 'Your team will appear here once members are assigned to you.'
+                : 'Try adjusting your search or filter criteria.'}
+              action={hasFilters ? (
+                <button
+                  onClick={() => { setSearch(''); setDeptFilter('ALL'); setStatusFilter('ALL') }}
+                  className="btn-ghost text-sm"
+                >
+                  Clear all filters
+                </button>
+              ) : null}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(emp => (

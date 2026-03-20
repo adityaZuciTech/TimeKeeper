@@ -8,7 +8,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton } from '../../components/ui'
 import Modal from '../../components/Modal'
 import { employeeService } from '../../services/employeeService'
 import {
@@ -322,6 +322,10 @@ export default function Employees() {
   // Drawer
   const [drawerEmp, setDrawerEmp]   = useState(null)
 
+  // Deactivate confirm dialog (heuristic #5 — error prevention)
+  const [confirmToggle, setConfirmToggle] = useState(null) // holds emp object
+  const [toggleLoading, setToggleLoading] = useState(false)
+
   useEffect(() => {
     dispatch(fetchEmployees())
     dispatch(fetchDepartments())
@@ -391,19 +395,34 @@ export default function Employees() {
     }
   }
 
-  const toggleStatus = async (emp) => {
-    const newStatus = emp.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+  const toggleStatus = (emp) => {
+    // Only prompt confirmation for deactivation; activation is safe
+    if (emp.status === 'ACTIVE') {
+      setConfirmToggle(emp)
+    } else {
+      doToggleStatus(emp)
+    }
+  }
+
+  const doToggleStatus = async (emp) => {
+    const target = emp || confirmToggle
+    const newStatus = target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    setToggleLoading(true)
     try {
-      await dispatch(updateEmployeeStatus({ id: emp.id, status: newStatus })).unwrap()
+      await dispatch(updateEmployeeStatus({ id: target.id, status: newStatus })).unwrap()
       toast.success(`Employee ${newStatus === 'ACTIVE' ? 'activated' : 'deactivated'}`)
-      if (drawerEmp?.id === emp.id) setDrawerEmp(prev => ({ ...prev, status: newStatus }))
+      if (drawerEmp?.id === target.id) setDrawerEmp(prev => ({ ...prev, status: newStatus }))
+      setConfirmToggle(null)
     } catch (err) {
       toast.error(err || 'Failed')
+    } finally {
+      setToggleLoading(false)
     }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
+    <>
     <Layout>
 
       {/* Header */}
@@ -505,17 +524,19 @@ export default function Employees() {
       </div>
 
       {/* Table */}
-      {loading ? <LoadingSpinner /> : (
+      {loading ? <SkeletonRows rows={6} cols={4} /> : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-                <Users size={22} className="text-muted-foreground/40" />
-              </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                {employees.length === 0 ? 'No employees yet' : 'No employees match your filters'}
-              </p>
-            </div>
+            <EmptyState
+              icon={Users}
+              title={employees.length === 0 ? 'No employees yet' : 'No employees match your filters'}
+              description={employees.length === 0
+                ? 'Add your first employee to get started.'
+                : 'Try adjusting your search or filters to find who you\'re looking for.'}
+              action={employees.length === 0 && isAdmin
+                ? <button className="btn-primary text-sm" onClick={openCreate}><Plus size={14} /> Add Employee</button>
+                : null}
+            />
           ) : (
             <>
               {/* Desktop table */}
@@ -682,12 +703,26 @@ export default function Employees() {
           )}
           <div className="flex gap-3 pt-2">
             <button className="btn-secondary flex-1" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
-            <button className="btn-primary flex-1" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+            <LoadingButton className="flex-1" onClick={handleSave} loading={saving}>
+              {editTarget ? 'Save Changes' : 'Add Employee'}
+            </LoadingButton>
           </div>
         </div>
       </Modal>
     </Layout>
+
+    {/* Deactivate confirmation dialog */}
+    <ConfirmDialog
+      open={!!confirmToggle}
+      title={`Deactivate ${confirmToggle?.name}?`}
+      description="This employee will lose access to the system immediately. You can reactivate them at any time."
+      confirmLabel="Deactivate"
+      cancelLabel="Cancel"
+      variant="danger"
+      loading={toggleLoading}
+      onConfirm={() => doToggleStatus(confirmToggle)}
+      onCancel={() => setConfirmToggle(null)}
+    />
+  </>
   )
 }

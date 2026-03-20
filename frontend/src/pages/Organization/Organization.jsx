@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
@@ -519,7 +519,11 @@ export default function Organization() {
       </div>
 
       {/* ── Rows 2 & 3 ─────────────────────────────────────────────────────── */}
-      {loading ? <LoadingSpinner /> : (
+      {loading ? (
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <SkeletonRows rows={6} cols={5} />
+        </div>
+      ) : (
         <>
           {/* Row 2: Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -564,9 +568,11 @@ export default function Organization() {
               <p className="text-xs text-muted-foreground mb-4">Hours by department</p>
 
               {donutData.length === 0 ? (
-                <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
-                  No hours logged this week
-                </div>
+                <EmptyState
+                  icon={BarChart2}
+                  title="No hours this week"
+                  description="Department hour data will appear here once time is logged."
+                />
               ) : (
                 <>
                   <ResponsiveContainer width="100%" height={160}>
@@ -663,8 +669,12 @@ export default function Organization() {
                   <tbody>
                     {sortedDepts.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                          No department data for this period.
+                        <td colSpan={5} className="py-4 text-center">
+                          <EmptyState
+                            icon={Building2}
+                            title="No department data"
+                            description="No time has been logged for this period yet."
+                          />
                         </td>
                       </tr>
                     ) : sortedDepts.map((dept, idx) => {

@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { fetchMyTimesheets, selectMyTimesheets, selectTimesheetsLoading } from '../../features/timesheets/timesheetSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { StatusBadge, LoadingSpinner } from '../../components/ui'
+import { StatusBadge, LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import { format, parseISO, isSameWeek } from 'date-fns'
 import { FileText, CheckCircle2, Clock, Edit3, Plus, ArrowRight, CalendarDays, Zap } from 'lucide-react'
 
@@ -42,14 +42,18 @@ export default function Dashboard() {
 
   const recent = timesheets.slice(0, 6)
 
+  // Activity feed items use Lucide icons for visual consistency (heuristic #4)
   const activity = useMemo(() => timesheets.slice(0, 8).map(ts => ({
-    id:   ts.id,
-    icon: ts.status === 'SUBMITTED' ? '✅' : '📝',
-    text: ts.status === 'SUBMITTED'
+    id:    ts.id,
+    Icon:  ts.status === 'SUBMITTED' ? CheckCircle2 : ts.status === 'APPROVED' ? CheckCircle2 : Edit3,
+    color: ts.status === 'SUBMITTED' || ts.status === 'APPROVED' ? 'text-emerald-600 bg-emerald-50'
+           : ts.status === 'DRAFT' ? 'text-amber-600 bg-amber-50'
+           : 'text-muted-foreground bg-muted',
+    text:  ts.status === 'SUBMITTED'
       ? `Submitted ${format(parseISO(ts.weekStartDate), 'MMM d')}–${format(parseISO(ts.weekEndDate), 'MMM d')}`
       : `Draft: ${format(parseISO(ts.weekStartDate), 'MMM d')}–${format(parseISO(ts.weekEndDate), 'MMM d')}`,
-    sub:  `${Number(ts.totalHours || 0).toFixed(1)} hours logged`,
-    to:   `/timesheets/${ts.id}`,
+    sub:   `${Number(ts.totalHours || 0).toFixed(1)} hours logged`,
+    to:    `/timesheets/${ts.id}`,
   })), [timesheets])
 
   const weekLabel = ts =>
@@ -204,12 +208,14 @@ export default function Dashboard() {
           </div>
 
           {loading ? (
-            <div className="py-12"><LoadingSpinner /></div>
+            <SkeletonRows rows={4} cols={3} />
           ) : recent.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-sm text-muted-foreground mb-3">No timesheets yet</p>
-              <button className="btn-primary text-xs" onClick={() => navigate('/timesheets/new')}>Create your first</button>
-            </div>
+            <EmptyState
+              icon={Clock}
+              title="No timesheets yet"
+              description="Start tracking your time by creating your first timesheet."
+              action={<button className="btn-primary text-xs" onClick={() => navigate('/timesheets/new')}><Plus size={13} /> New Timesheet</button>}
+            />
           ) : (
             <div className="divide-y divide-border/50">
               {recent.map(ts => {
@@ -248,9 +254,19 @@ export default function Dashboard() {
             <p className="text-[11px] text-muted-foreground mt-0.5">Your recent timesheet actions</p>
           </div>
           {loading ? (
-            <div className="py-12"><LoadingSpinner /></div>
+            <div className="px-5 py-4 space-y-3 animate-pulse">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-full bg-muted flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-2.5 bg-muted rounded w-3/4" />
+                    <div className="h-2 bg-muted rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : activity.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">No activity yet</div>
+            <EmptyState icon={FileText} title="No activity yet" description="Your timesheet actions will appear here." />
           ) : (
             <div className="divide-y divide-border/40 overflow-y-auto">
               {activity.map(item => (
@@ -259,7 +275,9 @@ export default function Dashboard() {
                   to={item.to}
                   className="flex items-start gap-3 px-5 py-3 hover:bg-muted/30 transition-colors"
                 >
-                  <span className="text-sm mt-0.5 flex-shrink-0">{item.icon}</span>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${item.color}`}>
+                    <item.Icon size={13} />
+                  </div>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-foreground leading-snug">{item.text}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>

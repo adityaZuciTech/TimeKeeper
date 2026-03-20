@@ -7,7 +7,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import Modal from '../../components/Modal'
 import { reportService } from '../../services/reportService'
 import toast from 'react-hot-toast'
@@ -533,17 +533,20 @@ export default function Projects() {
       </div>
 
       {/* Table */}
-      {loading ? <LoadingSpinner /> : (
+      {loading ? (
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <SkeletonRows rows={6} cols={5} />
+        </div>
+      ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-                <Briefcase size={22} className="text-muted-foreground/40" />
-              </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                {projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}
-              </p>
-            </div>
+            <EmptyState
+              icon={Briefcase}
+              title={projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}
+              description={projects.length === 0
+                ? 'Create your first project to start tracking time against it.'
+                : 'Try adjusting your search or filter criteria.'}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

@@ -6,7 +6,7 @@ import {
   selectMyTimesheets, selectTimesheetsLoading,
 } from '../../features/timesheets/timesheetSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
 import { format, isThisWeek, isPast, parseISO, getWeek } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
@@ -271,6 +271,8 @@ export default function Timesheets() {
   const timesheets = useSelector(selectMyTimesheets)
   const loading    = useSelector(selectTimesheetsLoading)
   const [creating, setCreating] = useState(false)
+  // Quick status filter (heuristic #7 — flexibility and efficiency)
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   useEffect(() => { dispatch(fetchMyTimesheets()) }, [dispatch])
 
@@ -290,9 +292,17 @@ export default function Timesheets() {
   }
 
   // Sort newest first, split current vs past
-  const sorted       = [...timesheets].sort((a, b) => new Date(b.weekStartDate) - new Date(a.weekStartDate))
+  const sorted        = [...timesheets].sort((a, b) => new Date(b.weekStartDate) - new Date(a.weekStartDate))
   const currentWeekTs = sorted.find(ts => isCurrentWeek(ts.weekStartDate))
-  const olderTs       = sorted.filter(ts => !isCurrentWeek(ts.weekStartDate))
+  const allOlderTs    = sorted.filter(ts => !isCurrentWeek(ts.weekStartDate))
+
+  // Apply status filter to older timesheets only
+  const olderTs = statusFilter === 'ALL'
+    ? allOlderTs
+    : allOlderTs.filter(ts => {
+        if (statusFilter === 'OVERDUE') return isOverdue(ts)
+        return ts.status === statusFilter
+      })
 
   // Stats
   const totalHours   = timesheets.reduce((s, ts) => s + Number(ts.totalHours || 0), 0)
@@ -346,21 +356,20 @@ export default function Timesheets() {
       )}
 
       {loading ? (
-        <LoadingSpinner />
-      ) : timesheets.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-            <Calendar size={28} className="text-muted-foreground" />
-          </div>
-          <div>
-            <p className="font-heading font-semibold text-foreground">No timesheets yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Create your first timesheet to start logging time</p>
-          </div>
-          <button className="btn-primary flex items-center gap-2" onClick={handleCreateNew} disabled={creating}>
-            <Plus size={14} />
-            {creating ? 'Creating…' : 'Create This Week'}
-          </button>
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <SkeletonRows rows={5} cols={3} />
         </div>
+      ) : timesheets.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="No timesheets yet"
+          description="Create your first timesheet to start tracking your weekly hours."
+          action={
+            <button className="btn-primary flex items-center gap-2" onClick={handleCreateNew} disabled={creating}>
+              <Plus size={14} />{creating ? 'Creating…' : 'Create This Week'}
+            </button>
+          }
+        />
       ) : (
         <>
           {/* current week */}
@@ -387,16 +396,37 @@ export default function Timesheets() {
           )}
 
           {/* previous weeks */}
-          {olderTs.length > 0 && (
+          {allOlderTs.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                Previous Weeks
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {olderTs.map(ts => (
-                  <WeekCard key={ts.id} ts={ts} onOpen={() => handleOpen(ts.id)} />
-                ))}
+              {/* Filter bar (heuristic #7 — efficiency) */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Previous Weeks</p>
+                <div className="flex gap-1 p-0.5 bg-muted rounded-lg">
+                  {[{ val: 'ALL', label: 'All' }, { val: 'DRAFT', label: 'Draft' }, { val: 'SUBMITTED', label: 'Submitted' }, { val: 'APPROVED', label: 'Approved' }, { val: 'OVERDUE', label: 'Overdue' }].map(({ val, label }) => (
+                    <button
+                      key={val}
+                      onClick={() => setStatusFilter(val)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all
+                        ${statusFilter === val ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {olderTs.length === 0 ? (
+                <EmptyState
+                  icon={FileEdit}
+                  title={`No ${statusFilter.toLowerCase()} timesheets`}
+                  description="Try selecting a different filter above."
+                />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {olderTs.map(ts => (
+                    <WeekCard key={ts.id} ts={ts} onOpen={() => handleOpen(ts.id)} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </>
