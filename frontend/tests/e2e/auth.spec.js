@@ -4,8 +4,8 @@ import { test, expect } from '@playwright/test'
 // and the backend is running at http://localhost:8080.
 // Update ADMIN_EMAIL / ADMIN_PASSWORD to match your DataInitializer setup.
 
-const ADMIN_EMAIL = 'admin@timekeeper.com'
-const ADMIN_PASSWORD = 'admin123'
+const ADMIN_EMAIL = 'admin@timekeeper.app'
+const ADMIN_PASSWORD = 'Admin123!'
 
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {

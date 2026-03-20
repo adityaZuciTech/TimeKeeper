@@ -14,6 +14,15 @@ export const login = createAsyncThunk('auth/login', async (credentials, { reject
   }
 })
 
+export const logoutAsync = createAsyncThunk('auth/logout', async (_, { getState }) => {
+  try {
+    // Revoke the JWT on the server so it becomes immediately invalid
+    await authService.logout()
+  } catch {
+    // Ignore errors — local state is always cleared regardless
+  }
+})
+
 export const changePassword = createAsyncThunk('auth/changePassword', async (data, { rejectWithValue }) => {
   try {
     await authService.changePassword(data)
@@ -66,6 +75,19 @@ const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload
+      })
+      .addCase(logoutAsync.fulfilled, (state) => {
+        state.user = null
+        state.token = null
+        localStorage.removeItem('tk_token')
+        localStorage.removeItem('tk_user')
+      })
+      .addCase(logoutAsync.rejected, (state) => {
+        // Clear local state even if backend call failed
+        state.user = null
+        state.token = null
+        localStorage.removeItem('tk_token')
+        localStorage.removeItem('tk_user')
       })
   },
 })

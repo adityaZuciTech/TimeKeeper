@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { Bell, User, LogOut, Settings, ChevronDown, Clock, CheckCircle2 } from 'lucide-react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { selectCurrentUser, logout } from '../features/auth/authSlice'
+import { selectCurrentUser, logout, logoutAsync } from '../features/auth/authSlice'
 
 const SAMPLE_NOTIFICATIONS = [
   { id: 1, Icon: CheckCircle2, title: 'Timesheet approved', body: 'Your timesheet for last week was approved.', time: '2h ago', unread: false },
@@ -83,8 +83,8 @@ function UserMenu({ user, initials }) {
   const navigate = useNavigate()
   useClickOutside(ref, () => setOpen(false))
 
-  const handleLogout = () => {
-    dispatch(logout())
+  const handleLogout = async () => {
+    await dispatch(logoutAsync())
     navigate('/login', { replace: true })
   }
 
