@@ -19,6 +19,7 @@ import Profile from './pages/Profile/Profile'
 import MyLeaves from './pages/Leaves/MyLeaves'
 import TeamLeaves from './pages/Leaves/TeamLeaves'
 import Holidays from './pages/Holidays/Holidays'
+import NotFound from './pages/NotFound'
 
 function RootRedirect() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
@@ -61,8 +62,8 @@ export default function App() {
           <Route path="/organization" element={<Organization />} />
         </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* 404 — explicit not-found page instead of silent redirect */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )

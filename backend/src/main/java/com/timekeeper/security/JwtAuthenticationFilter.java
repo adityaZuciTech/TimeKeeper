@@ -1,11 +1,16 @@
 package com.timekeeper.security;
 
 import com.timekeeper.repository.EmployeeRepository;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -61,8 +67,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
+        } catch (ExpiredJwtException e) {
+            log.debug("JWT token expired for request to {}", request.getRequestURI());
+        } catch (MalformedJwtException | UnsupportedJwtException | SignatureException e) {
+            log.warn("Invalid JWT token for request to {}: {}", request.getRequestURI(), e.getMessage());
         } catch (Exception e) {
-            // Invalid token - continue without authentication
+            log.error("Unexpected error processing JWT for request to {}", request.getRequestURI(), e);
         }
 
         filterChain.doFilter(request, response);

@@ -37,6 +37,17 @@ public class TimesheetController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("timesheets", timesheets)));
     }
 
+    // Full paginated list of all my timesheets
+    @GetMapping("/my/all")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAllMyTimesheets(
+            @AuthenticationPrincipal Employee currentUser,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        var result = timesheetService.getAllTimesheetsPaged(currentUser.getId(), page, size);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     // Create timesheet for a week
     @PostMapping
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
@@ -99,7 +110,7 @@ public class TimesheetController {
     public ResponseEntity<ApiResponse<TimeEntryResponse>> updateEntry(
             @PathVariable String entryId,
             @AuthenticationPrincipal Employee currentUser,
-            @RequestBody UpdateTimeEntryRequest request) {
+            @Valid @RequestBody UpdateTimeEntryRequest request) {
         TimeEntryResponse response = timesheetService.updateEntry(entryId, currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

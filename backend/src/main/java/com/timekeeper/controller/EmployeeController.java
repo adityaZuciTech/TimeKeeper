@@ -62,7 +62,7 @@ public class EmployeeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeResponse>> update(
             @PathVariable String employeeId,
-            @RequestBody UpdateEmployeeRequest request) {
+            @Valid @RequestBody UpdateEmployeeRequest request) {
         return ResponseEntity.ok(ApiResponse.success(employeeService.update(employeeId, request)));
     }
 

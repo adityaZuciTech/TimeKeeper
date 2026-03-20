@@ -1,12 +1,10 @@
 package com.timekeeper.service;
 
+import com.timekeeper.dto.response.ReportResponse;
 import com.timekeeper.entity.*;
 import com.timekeeper.repository.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,30 +22,41 @@ public class ReportService {
     private final ProjectRepository projectRepository;
     private final DepartmentRepository departmentRepository;
 
-    public TeamUtilizationReport getTeamUtilization(String managerId, LocalDate weekStartDate) {
+    public ReportResponse.TeamUtilizationReport getTeamUtilization(String managerId, LocalDate weekStartDate) {
         List<Employee> team = employeeRepository.findByManagerId(managerId);
-        List<TeamMemberHours> members = new ArrayList<>();
 
-        for (Employee emp : team) {
-            BigDecimal hours = BigDecimal.ZERO;
-            Optional<Timesheet> ts = timesheetRepository.findByEmployeeIdAndWeekStartDate(emp.getId(), weekStartDate);
-            if (ts.isPresent()) {
-                BigDecimal h = timeEntryRepository.sumHoursLoggedByTimesheetId(ts.get().getId());
-                hours = h != null ? h : BigDecimal.ZERO;
-            }
-            members.add(new TeamMemberHours(emp.getId(), emp.getName(), hours));
+        // Single aggregate query for all team member hours this week
+        Map<String, BigDecimal> hoursMap = new HashMap<>();
+        for (Object[] row : timeEntryRepository.sumHoursByTeamMemberForWeek(managerId, weekStartDate)) {
+            hoursMap.put((String) row[0], (BigDecimal) row[1]);
         }
 
-        return new TeamUtilizationReport(weekStartDate, members);
+        List<ReportResponse.TeamMemberHours> members = team.stream()
+                .map(emp -> new ReportResponse.TeamMemberHours(emp.getId(), emp.getName(),
+                        hoursMap.getOrDefault(emp.getId(), BigDecimal.ZERO)))
+                .collect(Collectors.toList());
+
+        return new ReportResponse.TeamUtilizationReport(weekStartDate, members);
     }
 
-    public EmployeeTimesheetReport getEmployeeTimesheetReport(String employeeId, LocalDate weekStartDate) {
+    public ReportResponse.EmployeeTimesheetReport getEmployeeTimesheetReport(String requesterId, String requesterRole,
+                                                                              String employeeId, LocalDate weekStartDate) {
+        // MANAGER can only view reports for their own direct reports
+        if ("MANAGER".equals(requesterRole) && !requesterId.equals(employeeId)) {
+            List<Employee> team = employeeRepository.findByManagerId(requesterId);
+            boolean isDirectReport = team.stream().anyMatch(e -> e.getId().equals(employeeId));
+            if (!isDirectReport) {
+                throw new AccessDeniedException("Managers can only view reports for their direct reports");
+            }
+        }
+
         Employee emp = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new com.timekeeper.exception.ResourceNotFoundException("Employee not found"));
 
         Optional<Timesheet> tsOpt = timesheetRepository.findByEmployeeIdAndWeekStartDate(employeeId, weekStartDate);
         if (tsOpt.isEmpty()) {
-            return new EmployeeTimesheetReport(employeeId, emp.getName(), weekStartDate, BigDecimal.ZERO, new ArrayList<>());
+            return new ReportResponse.EmployeeTimesheetReport(employeeId, emp.getName(), weekStartDate,
+                    BigDecimal.ZERO, new ArrayList<>());
         }
 
         Timesheet ts = tsOpt.get();
@@ -63,112 +72,47 @@ public class ReportService {
             }
         }
 
-        List<DailyHours> daily = dayHours.entrySet().stream()
-                .map(de -> new DailyHours(de.getKey().name(), de.getValue()))
+        List<ReportResponse.DailyHours> daily = dayHours.entrySet().stream()
+                .map(de -> new ReportResponse.DailyHours(de.getKey().name(), de.getValue()))
                 .collect(Collectors.toList());
 
-        BigDecimal total = daily.stream().map(DailyHours::getHours).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = daily.stream().map(ReportResponse.DailyHours::getHours).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new EmployeeTimesheetReport(employeeId, emp.getName(), weekStartDate, total, daily);
+        return new ReportResponse.EmployeeTimesheetReport(employeeId, emp.getName(), weekStartDate, total, daily);
     }
 
-    public ProjectEffortReport getProjectEffort(String projectId) {
+    public ReportResponse.ProjectEffortReport getProjectEffort(String projectId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new com.timekeeper.exception.ResourceNotFoundException("Project not found"));
 
-        List<TimeEntry> entries = timeEntryRepository.findByProjectId(projectId);
-
-        Map<String, BigDecimal> empHours = new LinkedHashMap<>();
-        Map<String, String> empNames = new HashMap<>();
-
-        for (TimeEntry e : entries) {
-            String empId = e.getTimesheet().getEmployee().getId();
-            String empName = e.getTimesheet().getEmployee().getName();
-            empHours.merge(empId, e.getHoursLogged() != null ? e.getHoursLogged() : BigDecimal.ZERO, BigDecimal::add);
-            empNames.put(empId, empName);
-        }
-
-        List<ContributorHours> contributors = empHours.entrySet().stream()
-                .map(entry -> new ContributorHours(entry.getKey(), empNames.get(entry.getKey()), entry.getValue()))
+        // Single aggregate query — avoids loading all entries into memory
+        List<ReportResponse.ContributorHours> contributors = timeEntryRepository
+                .sumHoursByEmployeeForProject(projectId).stream()
+                .map(r -> new ReportResponse.ContributorHours((String) r[0], (String) r[1], (BigDecimal) r[2]))
                 .collect(Collectors.toList());
 
-        BigDecimal total = timeEntryRepository.sumHoursLoggedByProjectId(projectId);
+        BigDecimal total = contributors.stream()
+                .map(ReportResponse.ContributorHours::getHoursLogged)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new ProjectEffortReport(projectId, project.getName(), total != null ? total : BigDecimal.ZERO, contributors);
+        return new ReportResponse.ProjectEffortReport(projectId, project.getName(), total, contributors);
     }
 
-    public List<DepartmentUtilization> getDepartmentUtilization(LocalDate weekStartDate) {
+    public List<ReportResponse.DepartmentUtilization> getDepartmentUtilization(LocalDate weekStartDate) {
         List<Department> departments = departmentRepository.findAll();
-        List<DepartmentUtilization> result = new ArrayList<>();
 
-        for (Department dept : departments) {
-            List<Employee> employees = employeeRepository.findByDepartmentId(dept.getId());
-            BigDecimal totalHours = BigDecimal.ZERO;
-
-            for (Employee emp : employees) {
-                Optional<Timesheet> ts = timesheetRepository.findByEmployeeIdAndWeekStartDate(emp.getId(), weekStartDate);
-                if (ts.isPresent()) {
-                    BigDecimal h = timeEntryRepository.sumHoursLoggedByTimesheetId(ts.get().getId());
-                    if (h != null) totalHours = totalHours.add(h);
-                }
-            }
-
-            result.add(new DepartmentUtilization(dept.getId(), dept.getName(), employees.size(), totalHours));
+        // Single aggregate query — replaces O(N×M) DB calls
+        Map<String, BigDecimal> hoursMap = new HashMap<>();
+        for (Object[] row : timeEntryRepository.sumHoursByDepartmentForWeek(weekStartDate)) {
+            hoursMap.put((String) row[0], (BigDecimal) row[1]);
         }
 
-        return result;
-    }
-
-    // --- Report DTOs ---
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class TeamUtilizationReport {
-        private LocalDate weekStartDate;
-        private List<TeamMemberHours> team;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class TeamMemberHours {
-        private String employeeId;
-        private String employeeName;
-        private BigDecimal hoursLogged;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class EmployeeTimesheetReport {
-        private String employeeId;
-        private String employeeName;
-        private LocalDate weekStartDate;
-        private BigDecimal totalHours;
-        private List<DailyHours> dailySummary;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class DailyHours {
-        private String day;
-        private BigDecimal hours;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class ProjectEffortReport {
-        private String projectId;
-        private String projectName;
-        private BigDecimal totalHoursLogged;
-        private List<ContributorHours> contributors;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class ContributorHours {
-        private String employeeId;
-        private String employeeName;
-        private BigDecimal hoursLogged;
-    }
-
-    @Data @AllArgsConstructor @NoArgsConstructor
-    public static class DepartmentUtilization {
-        private String departmentId;
-        private String departmentName;
-        private int employeeCount;
-        private BigDecimal totalHours;
+        return departments.stream()
+                .map(dept -> {
+                    long empCount = employeeRepository.countByDepartmentId(dept.getId());
+                    BigDecimal totalHours = hoursMap.getOrDefault(dept.getId(), BigDecimal.ZERO);
+                    return new ReportResponse.DepartmentUtilization(dept.getId(), dept.getName(), (int) empCount, totalHours);
+                })
+                .collect(Collectors.toList());
     }
 }

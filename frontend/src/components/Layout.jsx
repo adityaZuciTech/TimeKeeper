@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom'
 import { selectCurrentUser, logout } from '../features/auth/authSlice'
 
 const SAMPLE_NOTIFICATIONS = [
-  { id: 1, Icon: CheckCircle2, title: 'Timesheet approved', body: 'Your timesheet for last week was approved.', time: '2h ago', unread: true },
-  { id: 2, Icon: Clock, title: 'Timesheet due soon', body: 'Weekly timesheet is due this Friday.', time: '1d ago', unread: true },
+  { id: 1, Icon: CheckCircle2, title: 'Timesheet approved', body: 'Your timesheet for last week was approved.', time: '2h ago', unread: false },
+  { id: 2, Icon: Clock, title: 'Timesheet due soon', body: 'Weekly timesheet is due this Friday.', time: '1d ago', unread: false },
   { id: 3, Icon: User, title: 'Team leave notice', body: 'John Smith is on leave tomorrow.', time: '2d ago', unread: false },
 ]
 
@@ -48,10 +48,15 @@ function NotificationBell() {
               </span>
             )}
           </div>
+          <div className="px-4 py-2 bg-amber-50 border-b border-amber-100">
+            <p className="text-[11px] text-amber-700 font-medium text-center">
+              Real-time notifications — Coming Soon
+            </p>
+          </div>
           <div className="divide-y divide-border max-h-72 overflow-y-auto">
             {SAMPLE_NOTIFICATIONS.map(n => (
-              <div key={n.id} className={`px-4 py-3 flex gap-3 hover:bg-muted/50 transition-colors cursor-pointer ${n.unread ? 'bg-primary/5' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${n.unread ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>
+              <div key={n.id} className="px-4 py-3 flex gap-3 opacity-60">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-muted text-muted-foreground">
                   <n.Icon size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -59,12 +64,11 @@ function NotificationBell() {
                   <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.body}</p>
                   <p className="text-[11px] text-muted-foreground/70 mt-1">{n.time}</p>
                 </div>
-                {n.unread && <span className="w-2 h-2 bg-primary rounded-full mt-1.5 flex-shrink-0" />}
               </div>
             ))}
           </div>
           <div className="px-4 py-2.5 border-t border-border text-center">
-            <button className="text-xs text-primary hover:underline font-medium">View all notifications</button>
+            <span className="text-xs text-muted-foreground font-medium">Notification history — Coming Soon</span>
           </div>
         </div>
       )}

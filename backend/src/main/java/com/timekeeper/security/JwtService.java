@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 @Service
+@RequiredArgsConstructor
 public class JwtService {
 
     @Value("${jwt.secret}")
@@ -23,6 +25,8 @@ public class JwtService {
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    private final TokenBlacklist tokenBlacklist;
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -47,7 +51,18 @@ public class JwtService {
                 .compact();
     }
 
+    /** Revoke a token immediately by adding it to the in-memory blacklist. */
+    public void revokeToken(String token) {
+        try {
+            Date expiry = extractExpiration(token);
+            tokenBlacklist.blacklist(token, expiry.getTime());
+        } catch (Exception ignored) {
+            // If the token cannot be parsed it is already invalid — nothing to revoke
+        }
+    }
+
     public boolean isTokenValid(String token, UserDetails userDetails) {
+        if (tokenBlacklist.isBlacklisted(token)) return false;
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
@@ -56,7 +71,7 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token) {
+    public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
 

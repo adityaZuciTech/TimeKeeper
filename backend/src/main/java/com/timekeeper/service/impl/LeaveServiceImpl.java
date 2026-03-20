@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,11 +35,6 @@ public class LeaveServiceImpl implements LeaveService {
     @Transactional
     public LeaveResponse applyLeave(String employeeId, CreateLeaveRequest request) {
         LocalDate today = LocalDate.now();
-
-        // Validate start date is not in the past
-        if (request.getStartDate().isBefore(today)) {
-            throw new BusinessException("Cannot apply leave for a past date");
-        }
 
         // Validate end date >= start date
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -85,14 +80,16 @@ public class LeaveServiceImpl implements LeaveService {
 
     @Override
     public List<LeaveResponse> getMyLeaves(String employeeId) {
-        return leaveRepository.findByEmployeeIdOrderByCreatedAtDesc(employeeId)
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        List<Leave> leaves = leaveRepository.findByEmployeeIdOrderByCreatedAtDesc(employeeId);
+        Map<String, String> approverNames = resolveApproverNames(leaves);
+        return leaves.stream().map(l -> toResponse(l, approverNames)).collect(Collectors.toList());
     }
 
     @Override
     public List<LeaveResponse> getTeamLeaves(String managerId) {
-        return leaveRepository.findTeamLeavesByManagerId(managerId)
-                .stream().map(this::toResponse).collect(Collectors.toList());
+        List<Leave> leaves = leaveRepository.findTeamLeavesByManagerId(managerId);
+        Map<String, String> approverNames = resolveApproverNames(leaves);
+        return leaves.stream().map(l -> toResponse(l, approverNames)).collect(Collectors.toList());
     }
 
     @Override
@@ -109,7 +106,7 @@ public class LeaveServiceImpl implements LeaveService {
         leave.setApprovedBy(approverId);
         leave = leaveRepository.save(leave);
         log.info("Leave {} approved by {}", leaveId, approverId);
-        return toResponse(leave);
+        return toResponse(leave, resolveApproverNames(List.of(leave)));
     }
 
     @Override
@@ -129,16 +126,33 @@ public class LeaveServiceImpl implements LeaveService {
         }
         leave = leaveRepository.save(leave);
         log.info("Leave {} rejected by {}", leaveId, approverId);
-        return toResponse(leave);
+        return toResponse(leave, resolveApproverNames(List.of(leave)));
+    }
+
+    /**
+     * Batch-resolve approver display names from a list of leaves.
+     * Avoids 1 DB query per leave (N+1).
+     */
+    private Map<String, String> resolveApproverNames(List<Leave> leaves) {
+        Set<String> approverIds = leaves.stream()
+                .map(Leave::getApprovedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (approverIds.isEmpty()) return Map.of();
+
+        return employeeRepository.findAllById(approverIds).stream()
+                .collect(Collectors.toMap(Employee::getId, Employee::getName));
     }
 
     private LeaveResponse toResponse(Leave leave) {
+        return toResponse(leave, Map.of());
+    }
+
+    private LeaveResponse toResponse(Leave leave, Map<String, String> approverNames) {
         Employee emp = leave.getEmployee();
-        String approvedByName = null;
-        if (leave.getApprovedBy() != null) {
-            approvedByName = employeeRepository.findById(leave.getApprovedBy())
-                    .map(Employee::getName).orElse(null);
-        }
+        String approvedByName = leave.getApprovedBy() != null
+                ? approverNames.get(leave.getApprovedBy()) : null;
 
         long totalDays = ChronoUnit.DAYS.between(leave.getStartDate(), leave.getEndDate()) + 1;
 

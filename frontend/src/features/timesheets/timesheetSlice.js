@@ -10,6 +10,15 @@ export const fetchMyTimesheets = createAsyncThunk('timesheets/fetchMy', async (_
   }
 })
 
+export const fetchAllTimesheets = createAsyncThunk('timesheets/fetchAll', async ({ page = 0, size = 10 } = {}, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.getAllTimesheets(page, size)
+    return response.data.data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to fetch timesheets')
+  }
+})
+
 export const fetchTimesheetById = createAsyncThunk('timesheets/fetchById', async (id, { rejectWithValue }) => {
   try {
     const response = await timesheetService.getById(id)
@@ -72,6 +81,8 @@ const timesheetSlice = createSlice({
   name: 'timesheets',
   initialState: {
     myTimesheets: [],
+    allTimesheets: [],
+    allTimesheetsMeta: { page: 0, totalPages: 0, totalElements: 0 },
     currentTimesheet: null,
     loading: false,
     entriesLoading: false,
@@ -89,6 +100,20 @@ const timesheetSlice = createSlice({
         state.myTimesheets = action.payload
       })
       .addCase(fetchMyTimesheets.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
+      })
+      .addCase(fetchAllTimesheets.pending, (state) => { state.loading = true })
+      .addCase(fetchAllTimesheets.fulfilled, (state, action) => {
+        state.loading = false
+        state.allTimesheets = action.payload.timesheets
+        state.allTimesheetsMeta = {
+          page: action.payload.page,
+          totalPages: action.payload.totalPages,
+          totalElements: action.payload.totalElements,
+        }
+      })
+      .addCase(fetchAllTimesheets.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload
       })
@@ -138,6 +163,8 @@ export const { clearError, clearCurrentTimesheet } = timesheetSlice.actions
 export default timesheetSlice.reducer
 
 export const selectMyTimesheets = (state) => state.timesheets.myTimesheets
+export const selectAllTimesheets = (state) => state.timesheets.allTimesheets
+export const selectAllTimesheetsMeta = (state) => state.timesheets.allTimesheetsMeta
 export const selectCurrentTimesheet = (state) => state.timesheets.currentTimesheet
 export const selectTimesheetsLoading = (state) => state.timesheets.loading
 export const selectEntriesLoading = (state) => state.timesheets.entriesLoading

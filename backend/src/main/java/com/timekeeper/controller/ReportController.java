@@ -2,6 +2,7 @@ package com.timekeeper.controller;
 
 import com.timekeeper.dto.request.PdfReportRequest;
 import com.timekeeper.dto.response.ApiResponse;
+import com.timekeeper.dto.response.ReportResponse;
 import com.timekeeper.entity.Employee;
 import com.timekeeper.service.PdfReportService;
 import com.timekeeper.service.ReportService;
@@ -27,39 +28,41 @@ public class ReportController {
 
     @GetMapping("/team-utilization")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ReportService.TeamUtilizationReport>> getTeamUtilization(
+    public ResponseEntity<ApiResponse<ReportResponse.TeamUtilizationReport>> getTeamUtilization(
             @AuthenticationPrincipal Employee currentUser,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
-        ReportService.TeamUtilizationReport report =
+        ReportResponse.TeamUtilizationReport report =
                 reportService.getTeamUtilization(currentUser.getId(), weekStartDate);
         return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/employee-timesheet")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ReportService.EmployeeTimesheetReport>> getEmployeeTimesheetReport(
+    public ResponseEntity<ApiResponse<ReportResponse.EmployeeTimesheetReport>> getEmployeeTimesheetReport(
+            @AuthenticationPrincipal Employee currentUser,
             @RequestParam String employeeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
-        ReportService.EmployeeTimesheetReport report =
-                reportService.getEmployeeTimesheetReport(employeeId, weekStartDate);
+        String role = currentUser.getRole().name();
+        ReportResponse.EmployeeTimesheetReport report =
+                reportService.getEmployeeTimesheetReport(currentUser.getId(), role, employeeId, weekStartDate);
         return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/project-effort")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ReportService.ProjectEffortReport>> getProjectEffort(
+    public ResponseEntity<ApiResponse<ReportResponse.ProjectEffortReport>> getProjectEffort(
             @RequestParam String projectId) {
-        ReportService.ProjectEffortReport report = reportService.getProjectEffort(projectId);
+        ReportResponse.ProjectEffortReport report = reportService.getProjectEffort(projectId);
         return ResponseEntity.ok(ApiResponse.success(report));
     }
 
     @GetMapping("/department-utilization")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ReportService.DepartmentUtilization>>> getDepartmentUtilization(
+    public ResponseEntity<ApiResponse<List<ReportResponse.DepartmentUtilization>>> getDepartmentUtilization(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
         if (weekStartDate == null) weekStartDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
-        List<ReportService.DepartmentUtilization> result =
+        List<ReportResponse.DepartmentUtilization> result =
                 reportService.getDepartmentUtilization(weekStartDate);
         return ResponseEntity.ok(ApiResponse.success(result));
     }

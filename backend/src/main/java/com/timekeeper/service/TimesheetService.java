@@ -11,6 +11,7 @@ import com.timekeeper.exception.ResourceNotFoundException;
 import com.timekeeper.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,15 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TimesheetService {
+
+    /** Explicit day-to-offset map. Avoids relying on enum ordinal() which is fragile. */
+    private static final Map<TimeEntry.DayOfWeek, Integer> DAY_OFFSET = Map.of(
+            TimeEntry.DayOfWeek.MONDAY,    0,
+            TimeEntry.DayOfWeek.TUESDAY,   1,
+            TimeEntry.DayOfWeek.WEDNESDAY, 2,
+            TimeEntry.DayOfWeek.THURSDAY,  3,
+            TimeEntry.DayOfWeek.FRIDAY,    4
+    );
 
     private final TimesheetRepository timesheetRepository;
     private final TimeEntryRepository timeEntryRepository;
@@ -80,6 +90,22 @@ public class TimesheetService {
         return timesheets.stream().map(this::toSummaryResponse).collect(Collectors.toList());
     }
 
+    public Map<String, Object> getAllTimesheetsPaged(String employeeId, int page, int size) {
+        org.springframework.data.domain.Pageable pageable =
+                PageRequest.of(page, Math.min(size, 50), org.springframework.data.domain.Sort.by("weekStartDate").descending());
+        org.springframework.data.domain.Page<Timesheet> tsPage =
+                timesheetRepository.findByEmployeeId(employeeId, pageable);
+        List<TimesheetResponse> content = tsPage.getContent().stream()
+                .map(this::toSummaryResponse).collect(Collectors.toList());
+        return Map.of(
+                "timesheets", content,
+                "page", page,
+                "size", size,
+                "totalElements", tsPage.getTotalElements(),
+                "totalPages", tsPage.getTotalPages()
+        );
+    }
+
     public TimesheetResponse getByWeek(String employeeId, LocalDate weekStartDate) {
         LocalDate weekStart = normalizeToMonday(weekStartDate);
         return timesheetRepository.findByEmployeeIdAndWeekStartDate(employeeId, weekStart)
@@ -93,10 +119,18 @@ public class TimesheetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
 
         if (!timesheet.getEmployee().getId().equals(employeeId)) {
-            throw new BusinessException("You can only submit your own timesheets");
+            throw new AccessDeniedException("You can only submit your own timesheets");
         }
         if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
             throw new BusinessException("Timesheet is already submitted");
+        }
+
+        // Prevent submitting a timesheet with no logged hours
+        List<TimeEntry> entries = timeEntryRepository.findByTimesheetId(timesheetId);
+        boolean hasWorkEntries = entries.stream()
+                .anyMatch(e -> e.getEntryType() == TimeEntry.EntryType.WORK);
+        if (!hasWorkEntries) {
+            throw new BusinessException("Cannot submit an empty timesheet. Please log at least one work entry.");
         }
 
         timesheet.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
@@ -110,14 +144,14 @@ public class TimesheetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
 
         if (!timesheet.getEmployee().getId().equals(employeeId)) {
-            throw new BusinessException("Access denied");
+            throw new AccessDeniedException("Access denied");
         }
         if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
             throw new BusinessException("Cannot modify a submitted timesheet");
         }
 
         // Block entries on holidays or approved leave days
-        LocalDate dayDate = timesheet.getWeekStartDate().plusDays(request.getDay().ordinal());
+        LocalDate dayDate = timesheet.getWeekStartDate().plusDays(DAY_OFFSET.get(request.getDay()));
         List<Holiday> holidaysOnDay = holidayRepository.findByDateBetween(dayDate, dayDate);
         if (!holidaysOnDay.isEmpty()) {
             throw new BusinessException("Cannot log time on a company holiday: " + holidaysOnDay.get(0).getName());
@@ -164,7 +198,7 @@ public class TimesheetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Time entry not found: " + entryId));
 
         if (!entry.getTimesheet().getEmployee().getId().equals(employeeId)) {
-            throw new BusinessException("Access denied");
+            throw new AccessDeniedException("Access denied");
         }
         if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
             throw new BusinessException("Cannot modify a submitted timesheet");
@@ -220,7 +254,7 @@ public class TimesheetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Time entry not found: " + entryId));
 
         if (!entry.getTimesheet().getEmployee().getId().equals(employeeId)) {
-            throw new BusinessException("Access denied");
+            throw new AccessDeniedException("Access denied");
         }
         if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
             throw new BusinessException("Cannot modify a submitted timesheet");

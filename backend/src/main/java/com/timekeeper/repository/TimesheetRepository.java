@@ -2,6 +2,8 @@ package com.timekeeper.repository;
 
 import com.timekeeper.entity.Employee;
 import com.timekeeper.entity.Timesheet;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,15 +19,15 @@ public interface TimesheetRepository extends JpaRepository<Timesheet, String> {
 
     @Query("SELECT t FROM Timesheet t WHERE t.employee.id = :employeeId ORDER BY t.weekStartDate DESC")
     List<Timesheet> findTop5ByEmployeeIdOrderByWeekStartDateDesc(@Param("employeeId") String employeeId,
-                                                                   org.springframework.data.domain.Pageable pageable);
+                                                                   Pageable pageable);
+
+    Page<Timesheet> findByEmployeeId(String employeeId, Pageable pageable);
 
     List<Timesheet> findByStatusAndWeekEndDateBefore(Timesheet.TimesheetStatus status, LocalDate date);
 
     @Query("SELECT t FROM Timesheet t WHERE t.employee.managerId = :managerId AND t.weekStartDate = :weekStartDate")
     List<Timesheet> findTeamTimesheetsByManagerIdAndWeek(@Param("managerId") String managerId,
                                                           @Param("weekStartDate") LocalDate weekStartDate);
-
-    List<Timesheet> findByEmployeeId(String employeeId);
 
     /**
      * Returns all active employees who do NOT have a SUBMITTED or APPROVED timesheet

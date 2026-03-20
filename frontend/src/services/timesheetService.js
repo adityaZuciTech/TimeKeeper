@@ -2,6 +2,7 @@ import apiClient from './apiClient'
 
 export const timesheetService = {
   getMyTimesheets: () => apiClient.get('/timesheets/my'),
+  getAllTimesheets: (page = 0, size = 10) => apiClient.get('/timesheets/my/all', { params: { page, size } }),
   create: (data) => apiClient.post('/timesheets', data),
   getById: (id) => apiClient.get(`/timesheets/${id}`),
   getByWeek: (weekStartDate) => apiClient.get('/timesheets', { params: { weekStartDate } }),

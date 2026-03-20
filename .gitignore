@@ -14,10 +14,10 @@ backend/.mvn/
 # ── Backend: compiled class files ────────
 **/*.class
 
-# ── Backend: Spring Boot app properties (if they contain secrets) ──
-# Uncomment the lines below if you move secrets to a local-only file
-# backend/src/main/resources/application-local.properties
-# backend/src/main/resources/application-secrets.properties
+# ── Backend: Spring Boot profile properties with secrets ─────────
+backend/src/main/resources/application-dev.properties
+backend/src/main/resources/application-local.properties
+backend/src/main/resources/application-secrets.properties
 
 # ── Backend: H2 database files ───────────
 *.db

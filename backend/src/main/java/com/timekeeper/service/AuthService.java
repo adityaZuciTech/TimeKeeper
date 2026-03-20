@@ -10,12 +10,13 @@ import com.timekeeper.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AuthService {
+public class AuthService implements IAuthService {
 
     private final EmployeeRepository employeeRepository;
     private final JwtService jwtService;
@@ -23,12 +24,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
 
     public LoginResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
+        Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        Employee employee = employeeRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("User not found"));
+        // Reuse the principal already loaded by AuthenticationManager — no second DB call
+        Employee employee = (Employee) auth.getPrincipal();
 
         String token = jwtService.generateToken(employee);
 
