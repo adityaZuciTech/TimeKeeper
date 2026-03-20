@@ -1,5 +1,14 @@
 # TimeKeeper Product Specification
 
+> **Note:** This document is a legacy planning artifact. For the current production-grade documentation, refer to the following files:
+> - [product-overview.md](product-overview.md) — full tech stack, navigation, in/out scope
+> - [feature-list.md](feature-list.md) — complete feature inventory with implementation status
+> - [user-roles-and-permissions.md](user-roles-and-permissions.md) — permission matrix and security model
+> - [architecture.md](architecture.md) — system design and request lifecycle
+> - [api-specification.md](api-specification.md) — complete API reference
+
+---
+
 ## Overview
 
 TimeKeeper enables organizations to track employee time allocation across projects in order to understand resource utilization and project effort.

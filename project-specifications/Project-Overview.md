@@ -1,5 +1,14 @@
 # TIMEKEEPER – PRODUCT FLOW & FEATURES DOCUMENT
 
+> **Note:** This document is a legacy planning artifact. For the current production-grade documentation, refer to the following files:
+> - [product-overview.md](product-overview.md) — tech stack, navigation map, constraints
+> - [feature-list.md](feature-list.md) — complete feature inventory with implementation status
+> - [user-roles-and-permissions.md](user-roles-and-permissions.md) — roles and permission matrix
+> - [architecture.md](architecture.md) — system architecture and request lifecycle
+> - [api-specification.md](api-specification.md) — complete API reference
+
+---
+
 ## 1. Product Overview
 
 TimeKeeper is a web-based time tracking application designed to help organizations track how employees spend their time on projects. The system allows employees to log their working hours, helps managers understand team utilization, and enables admins to monitor organization-wide project effort and department workload.
