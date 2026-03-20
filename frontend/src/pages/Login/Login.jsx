@@ -102,8 +102,9 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="label">Email address</label>
+                <label htmlFor="email" className="label">Email address</label>
                 <input
+                  id="email"
                   type="email" className="input" placeholder="you@company.com"
                   value={email} onChange={(e) => setEmail(e.target.value)}
                   required autoFocus
@@ -111,9 +112,10 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="label">Password</label>
+                <label htmlFor="password" className="label">Password</label>
                 <div className="relative">
                   <input
+                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     className="input pr-11" placeholder="••••••••"
                     value={password} onChange={(e) => setPassword(e.target.value)}

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
-const USER_EMAIL = 'admin@timekeeper.com'
-const USER_PASSWORD = 'admin123'
+const USER_EMAIL = 'admin@timekeeper.app'
+const USER_PASSWORD = 'Admin123!'
 
 test.describe('404 not found', () => {
   test('shows 404 page for unknown routes (unauthenticated)', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('404 not found', () => {
 test.describe('Leaves', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel(/email/i).fill(USER_EMAIL)
+    await page.getByLabel(/email address/i).fill(USER_EMAIL)
     await page.getByLabel(/password/i).fill(USER_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(/\/dashboard/)
@@ -29,7 +29,7 @@ test.describe('Leaves', () => {
   test('apply leave button is present', async ({ page }) => {
     await page.goto('/leaves/my')
     await expect(
-      page.getByRole('button', { name: /apply leave|request leave/i })
+      page.getByRole('button', { name: /apply leave|request leave/i }).first()
     ).toBeVisible({ timeout: 5000 })
   })
 })
@@ -37,7 +37,7 @@ test.describe('Leaves', () => {
 test.describe('Reports', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel(/email/i).fill(USER_EMAIL)
+    await page.getByLabel(/email address/i).fill(USER_EMAIL)
     await page.getByLabel(/password/i).fill(USER_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(/\/dashboard/)
