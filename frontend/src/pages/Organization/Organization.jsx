@@ -139,9 +139,12 @@ export default function Organization() {
   const [actionsOpen, setActionsOpen]   = useState(false)
   const [filterOpen, setFilterOpen]     = useState(false)
   const [reminderSending, setReminderSending] = useState(false)
+  const [pdfExporting, setPdfExporting] = useState(false)
 
-  const actionsRef = useRef(null)
-  const filterRef  = useRef(null)
+  const actionsRef   = useRef(null)
+  const filterRef    = useRef(null)
+  const trendChartRef = useRef(null)
+  const pieChartRef   = useRef(null)
 
   const selectedOption = DATE_OPTIONS.find(o => o.value === dateRange) || DATE_OPTIONS[0]
   const weekMonday     = getMonday(selectedOption.weeksAgo)
@@ -251,7 +254,44 @@ export default function Organization() {
       highlight: null,
     },
   ].filter(Boolean)
-
+  // ── Chart → base64 PNG ────────────────────────────────────────────────────
+  const captureChartImage = (ref) => {
+    const svgEl = ref.current?.querySelector('svg')
+    if (!svgEl) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      try {
+        const bbox = svgEl.getBoundingClientRect()
+        const w    = Math.round(bbox.width)  || 700
+        const h    = Math.round(bbox.height) || 300
+        const clone = svgEl.cloneNode(true)
+        clone.setAttribute('width',  w)
+        clone.setAttribute('height', h)
+        clone.setAttribute('xmlns',  'http://www.w3.org/2000/svg')
+        // Inline a safe font so PDF renderers show text correctly
+        const s = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+        s.textContent = 'text,tspan { font-family: Arial, Helvetica, sans-serif; }'
+        clone.insertBefore(s, clone.firstChild)
+        const svgStr = new XMLSerializer().serializeToString(clone)
+        const blob   = new Blob([svgStr], { type: 'image/svg+xml' })
+        const url    = URL.createObjectURL(blob)
+        const img    = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width  = w * 2   // 2× for crisp rendering in PDF
+          canvas.height = h * 2
+          const ctx = canvas.getContext('2d')
+          ctx.scale(2, 2)
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, w, h)
+          ctx.drawImage(img, 0, 0, w, h)
+          URL.revokeObjectURL(url)
+          resolve(canvas.toDataURL('image/png', 0.95))
+        }
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+        img.src = url
+      } catch { resolve(null) }
+    })
+  }
   // ── Actions ───────────────────────────────────────────────────────────────────
   const handleSendReminders = async () => {
     setReminderSending(true)
@@ -264,6 +304,61 @@ export default function Organization() {
       setReminderSending(false)
     }
     setActionsOpen(false)
+  }
+
+  const handleExportPdf = async () => {
+    setPdfExporting(true)
+    setActionsOpen(false)
+    try {
+      const [trendImg, pieImg] = await Promise.all([
+        captureChartImage(trendChartRef),
+        captureChartImage(pieChartRef),
+      ])
+
+      const totalDeptHours = deptWithColor.reduce((acc, d) => acc + Number(d.totalHours || 0), 0)
+
+      const payload = {
+        weekLabel: `${selectedOption.weeksAgo === 0 ? 'Week of' : selectedOption.label + ' ·'} ${format(weekMonday, 'MMMM d, yyyy')}`,
+        trendChartImage: trendImg,
+        pieChartImage: pieImg,
+        stats: {
+          departmentsCount: departments.length,
+          employeesCount:   totalEmployees,
+          totalHours:       `${totalHours.toFixed(0)}h`,
+          avgUtilization:   `${avgUtil.toFixed(0)}%`,
+          hoursTrend:       hoursTrend != null
+            ? `${hoursTrend >= 0 ? '+' : ''}${hoursTrend.toFixed(1)}% from last week`
+            : null,
+        },
+        departments: deptWithColor.map(d => {
+          const h    = Number(d.totalHours || 0)
+          const avg  = d.employeeCount > 0 ? h / d.employeeCount : 0
+          const util = Math.min(100, d.employeeCount > 0 ? (h / (d.employeeCount * 40)) * 100 : 0)
+          const pct  = totalDeptHours > 0 ? (h / totalDeptHours) * 100 : 0
+          return {
+            name:                d.departmentName,
+            employees:           d.employeeCount,
+            hours:               Math.round(h * 10) / 10,
+            avgHoursPerEmployee: Math.round(avg * 10) / 10,
+            utilization:         Math.round(util * 10) / 10,
+            percentage:          Math.round(pct * 10) / 10,
+          }
+        }),
+      }
+
+      const res  = await reportService.exportPdf(payload)
+      const url  = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href     = url
+      link.download = `timekeeper-report-${selectedOption.label.replace(/\s+/g, '-').toLowerCase()}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success('PDF report downloaded!')
+    } catch {
+      toast.error('Failed to generate PDF report')
+    } finally {
+      setPdfExporting(false)
+    }
   }
 
   const handleExportCSV = () => {
@@ -367,11 +462,12 @@ export default function Organization() {
                 </button>
                 <div className="border-t border-border my-1" />
                 <button
-                  onClick={() => { toast('PDF export coming soon'); setActionsOpen(false) }}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 text-muted-foreground"
+                  onClick={handleExportPdf}
+                  disabled={pdfExporting || loading}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 disabled:opacity-50"
                 >
-                  <FileText size={14} />
-                  Export PDF Report
+                  <FileText size={14} className="text-primary" />
+                  {pdfExporting ? 'Generating PDF…' : 'Export PDF Report'}
                 </button>
               </div>
             )}
@@ -429,7 +525,7 @@ export default function Organization() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
             {/* Area chart — weekly trend */}
-            <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-sm p-6">
+            <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-sm p-6" ref={trendChartRef}>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h2 className="text-base font-heading font-semibold text-foreground">Weekly Hours Trend</h2>
@@ -463,7 +559,7 @@ export default function Organization() {
             </div>
 
             {/* Donut — department distribution */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-6" ref={pieChartRef}>
               <h2 className="text-base font-heading font-semibold text-foreground mb-0.5">Department Distribution</h2>
               <p className="text-xs text-muted-foreground mb-4">Hours by department</p>
 

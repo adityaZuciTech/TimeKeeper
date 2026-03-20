@@ -1,10 +1,14 @@
 package com.timekeeper.controller;
 
+import com.timekeeper.dto.request.PdfReportRequest;
 import com.timekeeper.dto.response.ApiResponse;
 import com.timekeeper.entity.Employee;
+import com.timekeeper.service.PdfReportService;
 import com.timekeeper.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +23,7 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
+    private final PdfReportService pdfReportService;
 
     @GetMapping("/team-utilization")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
@@ -57,5 +62,20 @@ public class ReportController {
         List<ReportService.DepartmentUtilization> result =
                 reportService.getDepartmentUtilization(weekStartDate);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @PostMapping("/export-pdf")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportPdfReport(@RequestBody PdfReportRequest request) {
+        try {
+            byte[] pdf = pdfReportService.generateOrgReport(request);
+            String filename = "timekeeper-report.pdf";
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(pdf);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

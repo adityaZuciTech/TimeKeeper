@@ -11,4 +11,6 @@ export const reportService = {
     apiClient.get('/reports/department-utilization', { params: { weekStartDate } }),
   triggerTimesheetReminders: () =>
     apiClient.post('/admin/reminders/timesheets'),
+  exportPdf: (payload) =>
+    apiClient.post('/reports/export-pdf', payload, { responseType: 'blob' }),
 }
