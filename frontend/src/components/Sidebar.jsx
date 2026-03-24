@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { selectCurrentUser } from '../features/auth/authSlice'
-import { selectBadges } from '../features/notifications/notificationSlice'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
+import { selectCurrentUser, logoutAsync } from '../features/auth/authSlice'
+import { selectBadges, selectUnreadCount } from '../features/notifications/notificationSlice'
 import {
   LayoutDashboard, Clock, Users, UserCheck, Building2,
   FolderKanban, BarChart2, User, Menu, X, ChevronRight, ChevronsLeft, ChevronsRight,
-  CalendarOff, CalendarDays,
+  CalendarOff, CalendarDays, LogOut, Bell,
 } from 'lucide-react'
 
 // Maps nav paths to badge keys in the notifications badges object
@@ -317,8 +317,19 @@ export default function Sidebar() {
     try { return localStorage.getItem('sidebar-collapsed') === 'true' } catch { return false }
   })
   const user = useSelector(selectCurrentUser)
+  const unreadCount = useSelector(selectUnreadCount)
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
 
   const groups = navGroups[user?.role] ?? navGroups.EMPLOYEE
+
+  const initials = user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2) || '?'
+
+  const handleLogout = async () => {
+    setMobileOpen(false)
+    await dispatch(logoutAsync())
+    navigate('/login', { replace: true })
+  }
 
   const handleToggleCollapse = () => {
     setCollapsed((v) => {
@@ -355,16 +366,48 @@ export default function Sidebar() {
           </div>
           <span className="font-semibold text-white text-sm">TimeKeeper</span>
         </div>
+
+        {/* Right side: notification badge + logout */}
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => navigate('/profile')}
+            className="relative p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary rounded-full flex items-center justify-center px-1">
+                <span className="text-[10px] font-bold text-primary-foreground leading-none">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+            aria-label="Profile"
+          >
+            {initials}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-md text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </div>
 
-      {/* Mobile overlay � icon-only compact sidebar */}
+      {/* Mobile overlay — full-width sidebar panel */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <div className="relative w-20 bg-gradient-to-b from-slate-800 to-slate-900 flex flex-col">
+          <div className="relative w-64 bg-gradient-to-b from-slate-800 to-slate-900 flex flex-col">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-2 z-10 p-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+              className="absolute top-4 right-3 z-10 p-1.5 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
               aria-label="Close menu"
             >
               <X size={16} />
@@ -372,8 +415,22 @@ export default function Sidebar() {
             <SidebarContent
               user={user}
               groups={groups}
-              collapsed={true}
+              collapsed={false}
             />
+            {/* Logout button anchored to the bottom of the panel */}
+            <div className="p-3 border-t border-slate-700 flex-shrink-0">
+              <div className="px-3 py-2 mb-1">
+                <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
+                <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+              >
+                <LogOut size={16} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -201,7 +201,7 @@ export default function Layout({ children }) {
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 flex-shrink-0 z-10">
+        <header className="h-14 bg-card border-b border-border items-center justify-between px-6 flex-shrink-0 z-10 hidden lg:flex">
           <p className="text-sm text-muted-foreground font-medium hidden sm:block">
             {format(new Date(), 'EEE, d MMM yyyy')}
           </p>
@@ -210,7 +210,7 @@ export default function Layout({ children }) {
             <UserMenu user={user} initials={initials} />
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6 overflow-y-auto pt-[88px] lg:pt-6">
           <div className="max-w-5xl mx-auto animate-slide-up">
             {children}
           </div>
