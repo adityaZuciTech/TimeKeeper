@@ -61,14 +61,14 @@ export function StatCard({ title, value, subtitle, icon, color = 'blue' }) {
   return (
     <div className="card-hover p-5 flex items-start gap-4">
       {icon && (
-        <div className={`p-2.5 rounded-xl flex-shrink-0 ${variant}`}>
+        <div className={`p-2.5 rounded-xl flex-shrink-0 ${variant}`} style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)' }}>
           {icon}
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{title}</p>
-        <p className="text-2xl font-semibold text-foreground tabular-nums">{value}</p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">{title}</p>
+        <p className="text-[26px] font-bold text-foreground tabular-nums leading-none mb-1">{value}</p>
+        {subtitle && <p className="text-[12px] text-muted-foreground">{subtitle}</p>}
       </div>
     </div>
   )
@@ -208,13 +208,16 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Confir
 // Animated placeholder rows for table/list loading states.
 export function SkeletonRows({ rows = 5, cols = 4 }) {
   return (
-    <div className="animate-pulse" aria-busy="true" aria-label="Loading�">
+    <div aria-busy="true" aria-label="Loading…">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-border/50 last:border-0">
-          <div className="w-8 h-8 rounded-full bg-muted flex-shrink-0" />
-          <div className="flex-1 flex gap-4">
+        <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-border/40 last:border-0">
+          <div className="w-9 h-9 rounded-full flex-shrink-0"
+               style={{ background: 'linear-gradient(90deg, hsl(220 18% 93%) 25%, hsl(220 18% 96%) 50%, hsl(220 18% 93%) 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.6s infinite' }} />
+          <div className="flex-1 flex gap-3">
             {Array.from({ length: cols }).map((__, j) => (
-              <div key={j} className={`h-3 bg-muted rounded ${j === 0 ? 'w-1/3' : 'w-1/5'}`} />
+              <div key={j}
+                   className={`h-3 rounded-full ${j === 0 ? 'w-2/5' : j === 1 ? 'w-1/4' : 'w-1/6'}`}
+                   style={{ background: 'linear-gradient(90deg, hsl(220 18% 93%) 25%, hsl(220 18% 96%) 50%, hsl(220 18% 93%) 75%)', backgroundSize: '200% 100%', animation: `shimmer 1.6s ${j * 0.1}s infinite` }} />
             ))}
           </div>
         </div>
@@ -226,10 +229,10 @@ export function SkeletonRows({ rows = 5, cols = 4 }) {
 // ---- PageHeader ----------------------------------------------------------
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div className="flex items-start justify-between mb-6 gap-4">
+    <div className="flex items-start justify-between mb-7 gap-4">
       <div>
         <h1 className="text-page-title">{title}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+        {subtitle && <p className="text-[13px] text-muted-foreground mt-1.5 leading-5">{subtitle}</p>}
       </div>
       {action && <div className="flex-shrink-0 ml-4 flex items-center gap-2">{action}</div>}
     </div>
@@ -241,12 +244,13 @@ export function PageHeader({ title, subtitle, action }) {
 export function EmptyState({ icon: Icon, title, description, message, action }) {
   const displayTitle = title || message || 'Nothing here yet'
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-center px-6">
-      <div className="w-14 h-14 rounded-2xl bg-muted/70 flex items-center justify-center mb-4">
-        {Icon ? <Icon size={24} className="text-muted-foreground/40" /> : <FileText size={24} className="text-muted-foreground/40" />}
+    <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-muted to-secondary flex items-center justify-center mb-5"
+           style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.06)' }}>
+        {Icon ? <Icon size={26} className="text-muted-foreground/50" /> : <FileText size={26} className="text-muted-foreground/50" />}
       </div>
-      <p className="text-base font-semibold text-foreground mb-1">{displayTitle}</p>
-      {description && <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">{description}</p>}
+      <p className="text-[15px] font-semibold text-foreground mb-1.5">{displayTitle}</p>
+      {description && <p className="text-[13px] text-muted-foreground max-w-xs leading-relaxed">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   )

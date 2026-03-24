@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import {
@@ -10,6 +10,8 @@ import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
 import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton, StatCard } from '../../components/ui'
 import Modal from '../../components/Modal'
+import PaginationBar from '../../components/PaginationBar'
+import SortableHeader from '../../components/SortableHeader'
 import { employeeService } from '../../services/employeeService'
 import {
   Plus, Search, MoreHorizontal, X, User, Mail, Building2,
@@ -311,8 +313,18 @@ export default function Employees() {
   // Drawer
   const [drawerEmp, setDrawerEmp]   = useState(null)
 
-  // Deactivate confirm dialog (heuristic #5 � error prevention)
-  const [confirmToggle, setConfirmToggle] = useState(null) // holds emp object
+  // Sorting
+  const [sortBy,  setSortBy]  = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+
+  // Pagination
+  const [page,     setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  // Reset page on filter change
+  const resetPage = () => setPage(1)
+
+  const [confirmToggle, setConfirmToggle] = useState(null)
   const [toggleLoading, setToggleLoading] = useState(false)
 
   useEffect(() => {
@@ -343,6 +355,31 @@ export default function Employees() {
     const statMatch = !statFilter || emp.status === statFilter
     return nameMatch && roleMatch && deptMatch && statMatch
   })
+
+  // Sort filtered list
+  const sortedFiltered = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let aVal, bVal
+      if      (sortBy === 'name')   { aVal = a.name?.toLowerCase();   bVal = b.name?.toLowerCase() }
+      else if (sortBy === 'role')   { aVal = a.role;                   bVal = b.role }
+      else if (sortBy === 'dept')   { aVal = a.departmentName?.toLowerCase() || ''; bVal = b.departmentName?.toLowerCase() || '' }
+      else if (sortBy === 'status') { aVal = a.status;                 bVal = b.status }
+      else                          { aVal = a.name?.toLowerCase();   bVal = b.name?.toLowerCase() }
+      if (aVal === bVal) return 0
+      const cmp = aVal > bVal ? 1 : -1
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortBy, sortDir])
+
+  // Paginate
+  const totalItems = sortedFiltered.length
+  const paginatedEmployees = sortedFiltered.slice((page - 1) * pageSize, page * pageSize)
+
+  const handleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
+    setPage(1)
+  }
 
   const stats = {
     total:    employees.length,
@@ -526,8 +563,8 @@ export default function Employees() {
 
       {/* Table */}
       {loading ? <SkeletonRows rows={6} cols={4} /> : (
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          {filtered.length === 0 ? (
+        <div className="bg-card rounded-2xl border border-border overflow-hidden" style={{ boxShadow: 'var(--shadow-sm)' }}>
+          {totalItems === 0 ? (
             <EmptyState
               icon={Users}
               title={employees.length === 0 ? 'No employees yet' : 'No employees match your filters'}
@@ -544,42 +581,50 @@ export default function Employees() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left px-5 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Employee</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Department</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Reports To</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3.5 w-10" />
+                    <tr className="border-b border-border/70">
+                      <th className="table-header rounded-tl-2xl">
+                        <SortableHeader col="name" label="Employee" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                      </th>
+                      <th className="table-header">
+                        <SortableHeader col="role" label="Role" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                      </th>
+                      <th className="table-header hidden lg:table-cell">
+                        <SortableHeader col="dept" label="Department" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                      </th>
+                      <th className="table-header hidden xl:table-cell">Reports To</th>
+                      <th className="table-header">
+                        <SortableHeader col="status" label="Status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                      </th>
+                      <th className="table-header rounded-tr-2xl w-10" />
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((emp, idx) => {
+                    {paginatedEmployees.map((emp, idx) => {
                       const mgr = emp.managerId ? employees.find(e => e.id === emp.managerId) : null
                       return (
                         <tr
                           key={emp.id}
                           onClick={() => setDrawerEmp(emp)}
-                          className={`group cursor-pointer hover:bg-muted/40 transition-colors
-                            ${idx < filtered.length - 1 ? 'border-b border-border/60' : ''}`}
+                          className={`group cursor-pointer hover:bg-accent/30 transition-colors duration-100
+                            ${idx < paginatedEmployees.length - 1 ? 'border-b border-border/50' : ''}`}
                         >
                           <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3.5">
                               <Avatar name={emp.name} size={36} online={emp.status === 'ACTIVE'} />
                               <div>
-                                <p className="font-semibold text-foreground text-sm leading-tight">{emp.name}</p>
-                                <p className="text-xs text-muted-foreground">{emp.email}</p>
+                                <p className="font-semibold text-foreground text-[13.5px] leading-tight">{emp.name}</p>
+                                <p className="text-[12px] text-muted-foreground mt-0.5">{emp.email}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4"><RoleBadge role={emp.role} /></td>
-                          <td className="px-4 py-4 hidden lg:table-cell text-sm text-muted-foreground">
+                          <td className="px-5 py-4"><RoleBadge role={emp.role} /></td>
+                          <td className="px-5 py-4 hidden lg:table-cell text-[13px] text-muted-foreground">
                             {emp.departmentName || <span className="text-muted-foreground/30">—</span>}
                           </td>
-                          <td className="px-4 py-4 hidden xl:table-cell text-sm text-muted-foreground">
+                          <td className="px-5 py-4 hidden xl:table-cell text-[13px] text-muted-foreground">
                             {mgr ? mgr.name : <span className="text-muted-foreground/30">—</span>}
                           </td>
-                          <td className="px-4 py-4"><StatusDot status={emp.status} /></td>
+                          <td className="px-5 py-4"><StatusDot status={emp.status} /></td>
                           <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                               <RowMenu
@@ -600,13 +645,13 @@ export default function Employees() {
 
               {/* Mobile card layout */}
               <div className="md:hidden divide-y divide-border">
-                {filtered.map(emp => {
+                {paginatedEmployees.map(emp => {
                   const mgr = emp.managerId ? employees.find(e => e.id === emp.managerId) : null
                   return (
                     <div
                       key={emp.id}
                       onClick={() => setDrawerEmp(emp)}
-                      className="flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors cursor-pointer"
+                      className="flex items-center gap-3 p-4 hover:bg-accent/30 transition-colors cursor-pointer"
                     >
                       <Avatar name={emp.name} size={40} online={emp.status === 'ACTIVE'} />
                       <div className="flex-1 min-w-0">
@@ -625,6 +670,15 @@ export default function Employees() {
                   )
                 })}
               </div>
+
+              {/* Pagination */}
+              <PaginationBar
+                page={page}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSize={(s) => { setPageSize(s); setPage(1) }}
+              />
             </>
           )}
         </div>

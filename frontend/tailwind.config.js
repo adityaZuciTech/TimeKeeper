@@ -110,6 +110,10 @@ export default {
           from: { height: 'var(--radix-accordion-content-height)' },
           to:   { height: '0' },
         },
+        'shimmer': {
+          '0%':   { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
       },
       animation: {
         'fade-in':        'fade-in 0.2s ease-out',
@@ -120,6 +124,7 @@ export default {
         'submit-glow':    'submit-glow 2s ease-in-out infinite',
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up':   'accordion-up 0.2s ease-out',
+        'shimmer':        'shimmer 1.6s linear infinite',
       },
     },
   },

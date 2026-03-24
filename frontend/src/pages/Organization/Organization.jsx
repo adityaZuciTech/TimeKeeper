@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
+﻿import { useEffect, useState, useMemo, useRef } from 'react'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
+import { EmptyState, SkeletonRows } from '../../components/ui'
+import PaginationBar from '../../components/PaginationBar'
+import SortableHeader from '../../components/SortableHeader'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
@@ -9,12 +11,12 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
 } from 'recharts'
 import {
-  Building2, Users, Clock, Activity, ChevronDown, ChevronUp,
+  Building2, Users, Clock, Activity, ChevronDown,
   Send, Download, FileText, AlertTriangle, Zap, ArrowUpRight,
   ArrowDownRight, Minus, BarChart2, Lightbulb, Target,
 } from 'lucide-react'
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CHART_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
 const DATE_OPTIONS = [
@@ -24,7 +26,7 @@ const DATE_OPTIONS = [
   { label: '3 Weeks Ago', value: 'three_weeks',  weeksAgo: 3 },
 ]
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getMonday(weeksAgo = 0) {
   const today = new Date()
   const day = today.getDay()
@@ -49,7 +51,7 @@ function utilBadge(pct) {
   return             { label: 'Low',      cls: 'bg-red-100    text-red-600'      }
 }
 
-// ─── SparkLine ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ SparkLine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SparkLine({ data, color }) {
   if (!data || data.length < 2) return null
   const chartData = data.map((v, i) => ({ i, v }))
@@ -65,7 +67,7 @@ function SparkLine({ data, color }) {
   )
 }
 
-// ─── StatCardPremium ───────────────────────────────────────────────────────────
+// â”€â”€â”€ StatCardPremium â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatCardPremium({ title, value, subtitle, trend, sparkData, icon: Icon, iconColor }) {
   const pos = trend > 0
   const neg = trend < 0
@@ -93,7 +95,7 @@ function StatCardPremium({ title, value, subtitle, trend, sparkData, icon: Icon,
   )
 }
 
-// ─── Tooltips ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tooltips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AreaTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
@@ -114,7 +116,7 @@ function DonutTooltip({ active, payload }) {
   )
 }
 
-// ─── InsightItem ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ InsightItem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function InsightItem({ icon: Icon, iconBg, text, highlight }) {
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
@@ -128,7 +130,7 @@ function InsightItem({ icon: Icon, iconBg, text, highlight }) {
   )
 }
 
-// ─── Main ──────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function Organization() {
   const [dateRange, setDateRange]       = useState('this_week')
   const [departments, setDepartments]   = useState([])
@@ -136,6 +138,8 @@ export default function Organization() {
   const [loading, setLoading]           = useState(true)
   const [sortBy, setSortBy]             = useState('hours')
   const [sortDir, setSortDir]           = useState('desc')
+  const [deptPage, setDeptPage]         = useState(1)
+  const [deptPageSize, setDeptPageSize] = useState(10)
   const [actionsOpen, setActionsOpen]   = useState(false)
   const [filterOpen, setFilterOpen]     = useState(false)
   const [reminderSending, setReminderSending] = useState(false)
@@ -149,7 +153,7 @@ export default function Organization() {
   const selectedOption = DATE_OPTIONS.find(o => o.value === dateRange) || DATE_OPTIONS[0]
   const weekMonday     = getMonday(selectedOption.weeksAgo)
 
-  // ── Load departments for selected week ──────────────────────────────────────
+  // â”€â”€ Load departments for selected week â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -162,7 +166,7 @@ export default function Organization() {
     load()
   }, [dateRange]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Load 6-week trend (once on mount) ───────────────────────────────────────
+  // â”€â”€ Load 6-week trend (once on mount) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const loadTrend = async () => {
       try {
@@ -181,7 +185,7 @@ export default function Organization() {
     loadTrend()
   }, [])
 
-  // ── Close dropdowns on outside click ────────────────────────────────────────
+  // â”€â”€ Close dropdowns on outside click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const handler = (e) => {
       if (actionsRef.current && !actionsRef.current.contains(e.target)) setActionsOpen(false)
@@ -191,7 +195,7 @@ export default function Organization() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // ── Derived stats ────────────────────────────────────────────────────────────
+  // â”€â”€ Derived stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const totalHours     = departments.reduce((acc, d) => acc + Number(d.totalHours || 0), 0)
   const totalEmployees = departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0)
   const avgUtil        = departments.length > 0
@@ -203,11 +207,11 @@ export default function Organization() {
   const hoursTrend = prevHours > 0 ? ((curHours - prevHours) / prevHours * 100) : null
   const sparkHours = trendData.map(d => d.hours)
 
-  // ── Stable color assignment per department ───────────────────────────────────
+  // â”€â”€ Stable color assignment per department â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const deptWithColor = departments.map((d, i) => ({ ...d, color: CHART_COLORS[i % CHART_COLORS.length] }))
 
-  // ── Sorted table rows ────────────────────────────────────────────────────────
-  const sortedDepts = [...deptWithColor].sort((a, b) => {
+  // â”€â”€ Sorted + paginated table rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const sortedDepts = useMemo(() => [...deptWithColor].sort((a, b) => {
     let aVal, bVal
     if      (sortBy === 'hours')       { aVal = Number(a.totalHours); bVal = Number(b.totalHours) }
     else if (sortBy === 'utilization') { aVal = calcUtil(a);          bVal = calcUtil(b)           }
@@ -215,14 +219,16 @@ export default function Organization() {
     else                               { aVal = a.departmentName;     bVal = b.departmentName      }
     if (aVal === bVal) return 0
     return sortDir === 'desc' ? (bVal > aVal ? 1 : -1) : (aVal > bVal ? 1 : -1)
-  })
+  }), [deptWithColor, sortBy, sortDir])
 
-  // ── Donut data ───────────────────────────────────────────────────────────────
+  const paginatedDepts = sortedDepts.slice((deptPage - 1) * deptPageSize, deptPage * deptPageSize)
+
+  // â”€â”€ Donut data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const donutData = deptWithColor
     .filter(d => Number(d.totalHours) > 0)
     .map(d => ({ name: d.departmentName, value: Math.round(Number(d.totalHours)), color: d.color }))
 
-  // ── Insights ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Insights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const bestDept  = deptWithColor.length > 0 ? deptWithColor.reduce((a, b) => calcUtil(a) >= calcUtil(b) ? a : b) : null
   const worstDept = deptWithColor.length > 1 ? deptWithColor.reduce((a, b) => calcUtil(a) <= calcUtil(b) ? a : b) : null
   const zeroDepts = deptWithColor.filter(d => Number(d.totalHours) === 0)
@@ -254,7 +260,7 @@ export default function Organization() {
       highlight: null,
     },
   ].filter(Boolean)
-  // ── Chart → base64 PNG ────────────────────────────────────────────────────
+  // â”€â”€ Chart â†’ base64 PNG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const captureChartImage = (ref) => {
     const svgEl = ref.current?.querySelector('svg')
     if (!svgEl) return Promise.resolve(null)
@@ -277,7 +283,7 @@ export default function Organization() {
         const img    = new Image()
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          canvas.width  = w * 2   // 2× for crisp rendering in PDF
+          canvas.width  = w * 2   // 2Ã— for crisp rendering in PDF
           canvas.height = h * 2
           const ctx = canvas.getContext('2d')
           ctx.scale(2, 2)
@@ -292,7 +298,7 @@ export default function Organization() {
       } catch { resolve(null) }
     })
   }
-  // ── Actions ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSendReminders = async () => {
     setReminderSending(true)
     try {
@@ -318,7 +324,7 @@ export default function Organization() {
       const totalDeptHours = deptWithColor.reduce((acc, d) => acc + Number(d.totalHours || 0), 0)
 
       const payload = {
-        weekLabel: `${selectedOption.weeksAgo === 0 ? 'Week of' : selectedOption.label + ' ·'} ${format(weekMonday, 'MMMM d, yyyy')}`,
+        weekLabel: `${selectedOption.weeksAgo === 0 ? 'Week of' : selectedOption.label + ' Â·'} ${format(weekMonday, 'MMMM d, yyyy')}`,
         trendChartImage: trendImg,
         pieChartImage: pieImg,
         stats: {
@@ -383,27 +389,21 @@ export default function Organization() {
   const toggleSort = (col) => {
     if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
     else { setSortBy(col); setSortDir('desc') }
+    setDeptPage(1)
   }
 
-  const getSortIcon = (col) => {
-    if (sortBy !== col) return <ChevronDown size={12} className="text-muted-foreground/40" />
-    return sortDir === 'desc'
-      ? <ChevronDown size={12} className="text-primary" />
-      : <ChevronUp   size={12} className="text-primary" />
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <Layout>
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-page-title">
             Organization Overview
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {selectedOption.weeksAgo === 0 ? 'Week of' : `${selectedOption.label} •`}{' '}
+            {selectedOption.weeksAgo === 0 ? 'Week of' : `${selectedOption.label} â€¢`}{' '}
             {format(weekMonday, 'MMMM d, yyyy')}
           </p>
         </div>
@@ -451,7 +451,7 @@ export default function Organization() {
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 disabled:opacity-50"
                 >
                   <Send size={14} className="text-primary" />
-                  {reminderSending ? 'Sending…' : 'Send Reminders'}
+                  {reminderSending ? 'Sendingâ€¦' : 'Send Reminders'}
                 </button>
                 <button
                   onClick={handleExportCSV}
@@ -467,7 +467,7 @@ export default function Organization() {
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 disabled:opacity-50"
                 >
                   <FileText size={14} className="text-primary" />
-                  {pdfExporting ? 'Generating PDF…' : 'Export PDF Report'}
+                  {pdfExporting ? 'Generating PDFâ€¦' : 'Export PDF Report'}
                 </button>
               </div>
             )}
@@ -475,25 +475,25 @@ export default function Organization() {
         </div>
       </div>
 
-      {/* ── Row 1: Stat Cards ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Row 1: Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCardPremium
           title="Departments"
-          value={loading ? '—' : departments.length}
+          value={loading ? 'â€”' : departments.length}
           subtitle="Active departments"
           icon={Building2}
           iconColor="bg-primary/10 text-primary"
         />
         <StatCardPremium
           title="Total Employees"
-          value={loading ? '—' : totalEmployees}
+          value={loading ? 'â€”' : totalEmployees}
           subtitle="Tracked this period"
           icon={Users}
           iconColor="bg-emerald-100 text-emerald-600"
         />
         <StatCardPremium
           title="Hours This Week"
-          value={loading ? '—' : `${totalHours.toFixed(0)}h`}
+          value={loading ? 'â€”' : `${totalHours.toFixed(0)}h`}
           trend={dateRange === 'this_week' ? hoursTrend : null}
           sparkData={sparkHours.length >= 2 ? sparkHours : null}
           icon={Clock}
@@ -501,7 +501,7 @@ export default function Organization() {
         />
         <StatCardPremium
           title="Avg Utilization"
-          value={loading ? '—' : `${avgUtil.toFixed(0)}%`}
+          value={loading ? 'â€”' : `${avgUtil.toFixed(0)}%`}
           subtitle={
             loading ? undefined
             : avgUtil >= 80 ? 'Excellent performance'
@@ -518,7 +518,7 @@ export default function Organization() {
         />
       </div>
 
-      {/* ── Rows 2 & 3 ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Rows 2 & 3 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {loading ? (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <SkeletonRows rows={6} cols={5} />
@@ -528,7 +528,7 @@ export default function Organization() {
           {/* Row 2: Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-            {/* Area chart — weekly trend */}
+            {/* Area chart â€” weekly trend */}
             <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-sm p-6" ref={trendChartRef}>
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -562,7 +562,7 @@ export default function Organization() {
               </ResponsiveContainer>
             </div>
 
-            {/* Donut — department distribution */}
+            {/* Donut â€” department distribution */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6" ref={pieChartRef}>
               <h2 className="text-base font-semibold text-foreground mb-0.5">Department Distribution</h2>
               <p className="text-xs text-muted-foreground mb-4">Hours by department</p>
@@ -642,32 +642,16 @@ export default function Organization() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border">
-                      {[
-                        { col: 'name',        label: 'Department' },
-                        { col: 'employees',   label: 'Employees'  },
-                        { col: 'hours',       label: 'Hours'      },
-                        { col: null,          label: 'Avg/Emp',    hidden: true },
-                        { col: 'utilization', label: 'Utilization' },
-                      ].map(({ col, label, hidden }) => (
-                        <th
-                          key={label}
-                          className={`text-left pb-3 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider ${hidden ? 'hidden md:table-cell' : ''}`}
-                        >
-                          {col ? (
-                            <button
-                              onClick={() => toggleSort(col)}
-                              className="flex items-center gap-1 hover:text-foreground transition-colors"
-                            >
-                              {label} {getSortIcon(col)}
-                            </button>
-                          ) : label}
-                        </th>
-                      ))}
+                    <tr className="border-b border-border/70">
+                      <th className="table-header"><SortableHeader col="name" label="Department" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} /></th>
+                      <th className="table-header"><SortableHeader col="employees" label="Employees" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} /></th>
+                      <th className="table-header"><SortableHeader col="hours" label="Hours" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} /></th>
+                      <th className="table-header hidden md:table-cell">Avg / Emp</th>
+                      <th className="table-header"><SortableHeader col="utilization" label="Utilization" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} /></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedDepts.length === 0 ? (
+                    {paginatedDepts.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-4 text-center">
                           <EmptyState
@@ -677,7 +661,7 @@ export default function Organization() {
                           />
                         </td>
                       </tr>
-                    ) : sortedDepts.map((dept, idx) => {
+                    ) : paginatedDepts.map((dept, idx) => {
                       const avg  = dept.employeeCount > 0
                         ? (Number(dept.totalHours) / dept.employeeCount).toFixed(1) : '0.0'
                       const util  = calcUtil(dept)
@@ -686,7 +670,7 @@ export default function Organization() {
                       return (
                         <tr
                           key={dept.departmentId}
-                          className={`hover:bg-muted/30 transition-colors ${idx < sortedDepts.length - 1 ? 'border-b border-border/60' : ''}`}
+                          className={`hover:bg-accent/30 transition-colors duration-100 ${idx < paginatedDepts.length - 1 ? 'border-b border-border/50' : ''}`}
                         >
                           <td className="py-3.5 pr-4">
                             <div className="flex items-center gap-2.5">
@@ -723,6 +707,16 @@ export default function Organization() {
                   </tbody>
                 </table>
               </div>
+              {sortedDepts.length > deptPageSize && (
+                <PaginationBar
+                  page={deptPage}
+                  totalItems={sortedDepts.length}
+                  pageSize={deptPageSize}
+                  onPageChange={setDeptPage}
+                  onPageSize={(s) => { setDeptPageSize(s); setDeptPage(1) }}
+                  pageSizeOptions={[5, 10, 25]}
+                />
+              )}
             </div>
           </div>
         </>

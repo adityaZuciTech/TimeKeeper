@@ -52,18 +52,18 @@ export default function Login() {
     <div className="min-h-screen flex">
       {/* Left panel - branding */}
       <div className="hidden lg:flex lg:w-[52%] bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-
+        <div className="absolute top-0 right-0 w-[28rem] h-[28rem] bg-white/[0.04] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/[0.04] rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full pointer-events-none" />
         <div className="flex items-center gap-3 relative z-10">
-          <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
-            <Clock size={18} className="text-primary-foreground" />
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center" style={{ boxShadow: '0 0 0 4px rgba(99,102,241,0.18)' }}>
+            <Clock size={19} className="text-white" />
           </div>
-          <span className="text-[15px] font-semibold text-sidebar-foreground tracking-tight">TimeKeeper</span>
+          <span className="text-[15px] font-bold text-sidebar-foreground tracking-tight">TimeKeeper</span>
         </div>
 
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold text-sidebar-foreground leading-tight mb-4">
+          <h1 className="text-[38px] font-bold text-sidebar-foreground leading-[1.15] mb-4 tracking-tight">
             Track time.<br />
             <span className="text-primary">Work smarter.</span>
           </h1>
@@ -71,15 +71,15 @@ export default function Login() {
             The modern time-tracking platform built for teams who value simplicity, visibility, and control.
           </p>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             {features.map(({ Icon, label, desc }) => (
               <div key={label} className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-md bg-white/10 flex items-center justify-center text-sidebar-foreground flex-shrink-0">
-                  <Icon size={18} />
+                <div className="w-9 h-9 rounded-lg bg-white/[0.09] border border-white/[0.12] flex items-center justify-center text-sidebar-foreground flex-shrink-0">
+                  <Icon size={17} />
                 </div>
                 <div>
-                  <p className="text-sidebar-foreground font-medium text-sm">{label}</p>
-                  <p className="text-sidebar-muted text-xs mt-0.5">{desc}</p>
+                  <p className="text-sidebar-foreground font-semibold text-[13.5px] leading-tight">{label}</p>
+                  <p className="text-sidebar-muted text-[12px] mt-0.5 leading-snug">{desc}</p>
                 </div>
               </div>
             ))}
@@ -95,16 +95,16 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-            <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
-              <Clock size={18} className="text-primary-foreground" />
+            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
+              <Clock size={18} className="text-white" />
             </div>
-            <span className="font-semibold text-foreground text-lg">TimeKeeper</span>
+            <span className="font-bold text-foreground text-lg tracking-tight">TimeKeeper</span>
           </div>
 
-          <div className="card">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h2>
-              <p className="text-muted-foreground text-sm mt-1">Sign in to your account to continue</p>
+          <div className="bg-card rounded-2xl border border-border p-8" style={{ boxShadow: 'var(--shadow-md)' }}>
+            <div className="mb-7">
+              <h2 className="text-[22px] font-bold text-foreground tracking-tight">Welcome back</h2>
+              <p className="text-muted-foreground text-[13.5px] mt-1.5 leading-5">Sign in to your account to continue</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -138,7 +138,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-primary w-full animate-submit-glow" disabled={loading}>
+              <button type="submit" className="btn-primary w-full mt-1 active:scale-[0.98] transition-transform" disabled={loading}>
                 {loading ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
