@@ -8,6 +8,7 @@ import com.timekeeper.exception.BusinessException;
 import com.timekeeper.repository.EmployeeRepository;
 import com.timekeeper.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService implements IAuthService {
 
@@ -50,10 +52,14 @@ public class AuthService implements IAuthService {
                 .orElseThrow(() -> new BusinessException("Employee not found"));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), employee.getPassword())) {
+            log.warn("[CHANGE PASSWORD] Incorrect current password attempt for employee id={} email={}",
+                    employeeId, employee.getEmail());
             throw new BusinessException("Current password is incorrect");
         }
 
         employee.setPassword(passwordEncoder.encode(request.getNewPassword()));
         employeeRepository.save(employee);
+        log.info("[CHANGE PASSWORD] Password updated successfully for employee id={} email={}",
+                employeeId, employee.getEmail());
     }
 }

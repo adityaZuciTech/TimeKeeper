@@ -1,4 +1,4 @@
-/** @type {import('tailwindcss').Config} */
+﻿/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
@@ -7,9 +7,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['Space Grotesk', 'system-ui', 'sans-serif'],
-        body:    ['IBM Plex Sans', 'system-ui', 'sans-serif'],
-        sans:    ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+        // Single unified font â€” Inter â€” used everywhere
+        heading: ['Inter', 'system-ui', 'sans-serif'],
+        body:    ['Inter', 'system-ui', 'sans-serif'],
+        sans:    ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         background:  'hsl(var(--background))',
@@ -21,7 +22,6 @@ export default {
         primary: {
           DEFAULT:    'hsl(var(--primary) / <alpha-value>)',
           foreground: 'hsl(var(--primary-foreground))',
-          // legacy shades – all map to Blueprint Blue family
           50:  'hsl(229 100% 97%)',
           100: 'hsl(229 100% 94%)',
           200: 'hsl(229 100% 88%)',
@@ -69,7 +69,30 @@ export default {
           muted:      'hsl(var(--sidebar-muted))',
         },
       },
+      borderRadius: {
+        'xl': '0.75rem',
+        '2xl': '1rem',
+        '3xl': '1.5rem',
+      },
       keyframes: {
+        // page enter
+        'fade-in': {
+          from: { opacity: '0' },
+          to:   { opacity: '1' },
+        },
+        'slide-up': {
+          from: { opacity: '0', transform: 'translateY(10px)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-down': {
+          from: { opacity: '0', transform: 'translateY(-8px)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
+        },
+        'scale-in': {
+          from: { opacity: '0', transform: 'scale(0.95)' },
+          to:   { opacity: '1', transform: 'scale(1)' },
+        },
+        // existing
         'daily-commit': {
           '0%':   { boxShadow: '0 0 0 0 hsl(229 100% 61.4% / 0.4)' },
           '70%':  { boxShadow: '0 0 0 8px hsl(229 100% 61.4% / 0)' },
@@ -89,6 +112,10 @@ export default {
         },
       },
       animation: {
+        'fade-in':        'fade-in 0.2s ease-out',
+        'slide-up':       'slide-up 0.25s ease-out',
+        'slide-down':     'slide-down 0.2s ease-out',
+        'scale-in':       'scale-in 0.18s ease-out',
         'daily-commit':   'daily-commit 0.8s ease-out',
         'submit-glow':    'submit-glow 2s ease-in-out infinite',
         'accordion-down': 'accordion-down 0.2s ease-out',

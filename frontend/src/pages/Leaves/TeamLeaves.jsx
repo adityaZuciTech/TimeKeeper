@@ -5,6 +5,7 @@ import {
   fetchTeamLeaves, approveLeave, rejectLeave,
   selectTeamLeaves, selectLeavesLoading,
 } from '../../features/leaves/leaveSlice'
+import { markSectionRead } from '../../features/notifications/notificationSlice'
 import Layout from '../../components/Layout'
 import { LoadingSpinner, PageHeader } from '../../components/ui'
 import Modal from '../../components/Modal'
@@ -34,6 +35,7 @@ export default function TeamLeaves() {
   const [actionLoading, setActionLoading] = useState(false)
 
   useEffect(() => { dispatch(fetchTeamLeaves()) }, [dispatch])
+  useEffect(() => { dispatch(markSectionRead('TEAM')) }, [dispatch])
 
   const filtered = filter === 'ALL' ? leaves : leaves.filter(l => l.status === filter)
   const pendingCount = leaves.filter(l => l.status === 'PENDING').length
@@ -99,7 +101,7 @@ export default function TeamLeaves() {
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users size={40} className="text-muted-foreground/30 mb-3" />
-              <p className="font-heading font-semibold text-foreground">No {filter !== 'ALL' ? filter.toLowerCase() : ''} leave requests</p>
+              <p className="font-semibold text-foreground">No {filter !== 'ALL' ? filter.toLowerCase() : ''} leave requests</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -119,7 +121,7 @@ export default function TeamLeaves() {
                   {filtered.map((leave) => (
                     <tr key={leave.id} className="hover:bg-muted/30 transition-colors">
                       <td className="table-cell">
-                        <p className="font-heading font-semibold text-foreground text-sm">{leave.employeeName}</p>
+                        <p className="font-semibold text-foreground text-sm">{leave.employeeName}</p>
                         {leave.employeeDepartment && (
                           <p className="text-xs text-muted-foreground">{leave.employeeDepartment}</p>
                         )}

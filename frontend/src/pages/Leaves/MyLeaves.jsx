@@ -1,14 +1,15 @@
-﻿import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { applyLeave, fetchMyLeaves, fetchTeamLeaves, selectMyLeaves, selectTeamLeaves, selectLeavesLoading } from '../../features/leaves/leaveSlice'
+import { markSectionRead } from '../../features/notifications/notificationSlice'
 import { fetchHolidays, selectHolidays } from '../../features/holidays/holidaySlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, StatCard } from '../../components/ui'
 import { Plus, CalendarOff, X, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Users, Thermometer, Coffee, Umbrella } from 'lucide-react'
 import { format, parseISO, isAfter, startOfDay, isSameYear } from 'date-fns'
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constants ─────────────────────────────────────────────────────────────────
 const LEAVE_TYPES = ['SICK', 'CASUAL', 'VACATION']
 
 const BALANCE_CONFIG = {
@@ -29,7 +30,7 @@ const REASON_TAGS = {
   VACATION: ['Annual vacation', 'Family trip', 'Travel plans', 'Rest & relaxation'],
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 function countWorkingDays(start, end, holidays) {
   if (!start || !end || end < start) return 0
   const holidaySet = new Set(holidays.map(h => h.date))
@@ -60,7 +61,7 @@ function findMyOverlaps(start, end, myLeaves) {
   )
 }
 
-// â”€â”€â”€ Avatar initials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Avatar initials ───────────────────────────────────────────────────────────
 function Avatar({ name, size = 'sm' }) {
   const initials = name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   const sz = size === 'sm' ? 'w-6 h-6 text-[9px]' : 'w-7 h-7 text-[10px]'
@@ -69,7 +70,7 @@ function Avatar({ name, size = 'sm' }) {
   return <span className={`${sz} ${color} rounded-full flex items-center justify-center font-semibold flex-shrink-0`}>{initials}</span>
 }
 
-// â”€â”€â”€ Leave Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Leave Drawer ──────────────────────────────────────────────────────────────
 function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeaves, myLeaves, holidays }) {
   const today    = new Date().toISOString().split('T')[0]
   const firstRef = useRef(null)
@@ -92,7 +93,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  // â”€â”€ Live calculations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Live calculations ──────────────────────────────────────────────────
   const workingDays = useMemo(() =>
     countWorkingDays(form.startDate, form.endDate, holidays)
   , [form.startDate, form.endDate, holidays])
@@ -132,10 +133,10 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
       <div className={`fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-card border-l border-border shadow-2xl flex flex-col
           transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <div>
-            <h2 className="text-base font-heading font-semibold text-foreground">Request Leave</h2>
+            <h2 className="text-base font-semibold text-foreground">Request Leave</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Submit a new leave request</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -143,10 +144,10 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
           </button>
         </div>
 
-        {/* â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Body ────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
-          {/* â”€â”€ Leave type cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Leave type cards ──────────────────────────────────────── */}
           <div>
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2.5 block">Leave Type</label>
             <div className="grid grid-cols-3 gap-2">
@@ -176,7 +177,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
             </div>
           </div>
 
-          {/* â”€â”€ Date range â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Date range ────────────────────────────────────────────── */}
           <div>
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2.5 block">
               Date Range
@@ -199,7 +200,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
               <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
                 <div className="flex-1">
                   <p className="text-[11px] text-muted-foreground">Working days requested</p>
-                  <p className="text-xl font-bold font-heading text-foreground tabular-nums leading-none mt-0.5">
+                  <p className="text-xl font-bold text-foreground tabular-nums leading-none mt-0.5">
                     {workingDays}
                     <span className="text-sm font-normal text-muted-foreground ml-1.5">
                       of {calDays} calendar day{calDays !== 1 ? 's' : ''}
@@ -216,7 +217,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
             )}
           </div>
 
-          {/* â”€â”€ Balance forecast bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Balance forecast bar ──────────────────────────────────── */}
           {activeBal && workingDays > 0 && (
             <div className="rounded-xl border px-4 py-3 space-y-2"
               style={{ borderColor: isLowBalance ? '#FCA5A5' : cfg?.color + '40', background: isLowBalance ? '#FFF1F2' : cfg?.bg }}>
@@ -242,7 +243,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
             </div>
           )}
 
-          {/* â”€â”€ Self-overlap warning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Self-overlap warning ──────────────────────────────────── */}
           {selfOverlaps.length > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-[11px] font-semibold text-amber-700 flex items-center gap-1.5 mb-1.5">
@@ -257,7 +258,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
             </div>
           )}
 
-          {/* â”€â”€ Team conflicts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Team conflicts ────────────────────────────────────────── */}
           {teamConflicts.length > 0 && (
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -285,7 +286,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
             </div>
           )}
 
-          {/* â”€â”€ Reason â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {/* ── Reason ───────────────────────────────────────────────── */}
           <div>
             <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
               Reason <span className="font-normal normal-case">(optional)</span>
@@ -319,7 +320,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
           )}
         </div>
 
-        {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Footer ──────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 border-t border-border px-5 py-4 space-y-2">
           {workingDays > 0 && (
             <p className="text-[11px] text-center text-muted-foreground mb-1">
@@ -351,7 +352,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
   )
 }
 
-// â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export default function MyLeaves() {
   const dispatch   = useDispatch()
   const leaves     = useSelector(selectMyLeaves)
@@ -367,9 +368,10 @@ export default function MyLeaves() {
     dispatch(fetchMyLeaves())
     dispatch(fetchTeamLeaves())
     dispatch(fetchHolidays())
+    dispatch(markSectionRead('LEAVE'))
   }, [dispatch])
 
-  // â”€â”€ Leave balances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Leave balances ───────────────────────────────────────────────────
   const balances = useMemo(() => {
     const used = { SICK: 0, CASUAL: 0, VACATION: 0 }
     leaves.forEach(l => {
@@ -385,7 +387,7 @@ export default function MyLeaves() {
     }))
   }, [leaves])
 
-  // â”€â”€ Upcoming holidays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Upcoming holidays ────────────────────────────────────────────────
   const upcomingHolidays = useMemo(() => {
     const today = startOfDay(new Date())
     return [...holidays]
@@ -394,7 +396,7 @@ export default function MyLeaves() {
       .slice(0, 5)
   }, [holidays])
 
-  // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Handlers ─────────────────────────────────────────────────────────
   const handleApply = async (form) => {
     if (!form.startDate || !form.endDate) { setFormError('Start and end dates are required'); return }
     if (form.endDate < form.startDate)    { setFormError('End date must be on or after start date'); return }
@@ -416,7 +418,7 @@ export default function MyLeaves() {
     }
   }
 
-  // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Stats ────────────────────────────────────────────────────────────
   const pending   = leaves.filter(l => l.status === 'PENDING').length
   const approved  = leaves.filter(l => l.status === 'APPROVED').length
   const totalUsed = leaves.filter(l => l.status === 'APPROVED').reduce((s, l) => s + l.totalDays, 0)
@@ -424,35 +426,25 @@ export default function MyLeaves() {
   return (
     <Layout>
 
-      {/* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Page header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-heading font-semibold text-foreground">My Leaves</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track your leave requests and balances</p>
+          <h1 className="text-page-title">My Leaves</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track your leave requests and balances</p>
         </div>
         <button className="btn-primary shrink-0" onClick={() => { setFormError(''); setDrawerOpen(true) }}>
           <Plus size={15} /> Apply Leave
         </button>
       </div>
 
-      {/* â”€â”€ Summary strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="grid grid-cols-3 gap-4 mb-7">
-        {[
-          { label: 'Pending',   value: pending,         icon: <AlertCircle size={15} />,  accent: '#F59E0B' },
-          { label: 'Approved',  value: approved,        icon: <CheckCircle2 size={15} />, accent: '#10B981' },
-          { label: 'Days Used', value: `${totalUsed}d`, icon: <Clock size={15} />,        accent: '#6366F1' },
-        ].map(s => (
-          <div key={s.label} className="card p-4 flex items-center gap-3">
-            <span className="p-2 rounded-xl flex-shrink-0" style={{ background: `${s.accent}1a`, color: s.accent }}>{s.icon}</span>
-            <div>
-              <p className="text-lg font-bold font-heading text-foreground tabular-nums leading-none">{s.value}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{s.label}</p>
-            </div>
-          </div>
-        ))}
+      {/* ── Summary strip ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <StatCard title="Pending Requests" value={pending}         icon={<AlertCircle size={16} />} color="amber" subtitle={pending === 0 ? 'All resolved' : `${pending} awaiting approval`} />
+        <StatCard title="Approved Leaves"  value={approved}        icon={<CheckCircle2 size={16} />} color="green" subtitle={approved === 0 ? 'None this year' : `${approved} approved`} />
+        <StatCard title="Days Used"        value={`${totalUsed}d`} icon={<Clock size={16} />}        color="blue"  subtitle={`of ${balances.reduce((s, b) => s + b.total, 0)} total days`} />
       </div>
 
-      {/* â”€â”€ Main grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Main grid ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Leave history */}
@@ -566,7 +558,7 @@ export default function MyLeaves() {
         </div>
       </div>
 
-      {/* â”€â”€ Apply Leave Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Apply Leave Drawer ─────────────────────────────────────────── */}
       <LeaveDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}

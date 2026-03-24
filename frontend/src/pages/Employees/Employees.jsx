@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import {
@@ -8,7 +8,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton, StatCard } from '../../components/ui'
 import Modal from '../../components/Modal'
 import { employeeService } from '../../services/employeeService'
 import {
@@ -17,7 +17,7 @@ import {
   Eye, Edit3, UserCheck, UserX, Briefcase, Lightbulb,
 } from 'lucide-react'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// --- Constants ----------------------------------------------------------------
 const ROLES = ['EMPLOYEE', 'MANAGER', 'ADMIN']
 
 const AVATAR_BG = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
@@ -31,7 +31,7 @@ const ROLE_META = {
   EMPLOYEE: { cls: 'bg-muted text-muted-foreground', label: 'Employee', icon: User       },
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// --- Avatar -------------------------------------------------------------------
 function Avatar({ name = '', size = 36, online, className = '' }) {
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   return (
@@ -52,7 +52,7 @@ function Avatar({ name = '', size = 36, online, className = '' }) {
   )
 }
 
-// ─── Role badge ───────────────────────────────────────────────────────────────
+// --- Role badge ---------------------------------------------------------------
 function RoleBadge({ role }) {
   const m = ROLE_META[role] || ROLE_META.EMPLOYEE
   return (
@@ -63,7 +63,7 @@ function RoleBadge({ role }) {
   )
 }
 
-// ─── Status dot ───────────────────────────────────────────────────────────────
+// --- Status dot ---------------------------------------------------------------
 function StatusDot({ status }) {
   const active = status === 'ACTIVE'
   return (
@@ -74,7 +74,7 @@ function StatusDot({ status }) {
   )
 }
 
-// ─── 3-dot row menu ───────────────────────────────────────────────────────────
+// --- 3-dot row menu -----------------------------------------------------------
 function RowMenu({ emp, onView, onEdit, onToggleStatus, isAdmin }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -126,20 +126,9 @@ function RowMenu({ emp, onView, onEdit, onToggleStatus, isAdmin }) {
   )
 }
 
-// ─── Summary card ─────────────────────────────────────────────────────────────
-function SummaryCard({ label, value, icon: Icon, iconCls }) {
-  return (
-    <div className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:shadow-md transition-shadow">
-      <div className={`inline-flex p-2 rounded-lg mb-3 ${iconCls}`}>
-        <Icon size={16} />
-      </div>
-      <p className="text-2xl font-heading font-bold text-foreground mb-0.5 tabular-nums">{value}</p>
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-    </div>
-  )
-}
 
-// ─── Employee Drawer ──────────────────────────────────────────────────────────
+
+// --- Employee Drawer ----------------------------------------------------------
 function TsSkeleton() {
   return (
     <div className="space-y-2 animate-pulse">
@@ -185,7 +174,7 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
           <div className="flex items-center gap-4">
             <Avatar name={emp.name} size={48} online={emp.status === 'ACTIVE'} />
             <div>
-              <h2 className="text-lg font-heading font-bold text-foreground leading-tight">{emp.name}</h2>
+              <h2 className="text-lg font-bold text-foreground leading-tight">{emp.name}</h2>
               <p className="text-sm text-muted-foreground mt-0.5">{emp.email}</p>
             </div>
           </div>
@@ -210,14 +199,14 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
                 <Building2 size={12} className="text-muted-foreground" />
                 <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Department</span>
               </div>
-              <p className="text-sm font-medium text-foreground">{emp.departmentName || '—'}</p>
+              <p className="text-sm font-medium text-foreground">{emp.departmentName || '�'}</p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <User size={12} className="text-muted-foreground" />
                 <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Reports To</span>
               </div>
-              <p className="text-sm font-medium text-foreground">{manager ? manager.name : '—'}</p>
+              <p className="text-sm font-medium text-foreground">{manager ? manager.name : '�'}</p>
             </div>
           </div>
 
@@ -242,7 +231,7 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
               <p className="text-xs text-red-500">Failed to load timesheet data.</p>
             ) : (
               <>
-                <p className="text-2xl font-heading font-bold text-foreground mb-3">
+                <p className="text-2xl font-bold text-foreground mb-3">
                   {totalHours.toFixed(0)}h
                   <span className="text-sm font-normal text-muted-foreground ml-1">total logged</span>
                 </p>
@@ -297,7 +286,7 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// --- Main ---------------------------------------------------------------------
 export default function Employees() {
   const dispatch    = useDispatch()
   const employees   = useSelector(selectEmployees)
@@ -322,7 +311,7 @@ export default function Employees() {
   // Drawer
   const [drawerEmp, setDrawerEmp]   = useState(null)
 
-  // Deactivate confirm dialog (heuristic #5 — error prevention)
+  // Deactivate confirm dialog (heuristic #5 � error prevention)
   const [confirmToggle, setConfirmToggle] = useState(null) // holds emp object
   const [toggleLoading, setToggleLoading] = useState(false)
 
@@ -331,8 +320,20 @@ export default function Employees() {
     dispatch(fetchDepartments())
   }, [dispatch])
 
-  // ── Derived ────────────────────────────────────────────────────────────────
+  // -- Derived ----------------------------------------------------------------
   const managers = employees.filter(e => e.role === 'MANAGER' || e.role === 'ADMIN')
+
+  // Only show managers from the selected department (if a dept is chosen)
+  const filteredManagers = form.departmentId
+    ? managers.filter(m => m.departmentId === form.departmentId)
+    : managers
+
+  const handleDeptChange = (deptId) => {
+    // Reset manager if it no longer belongs to the new department
+    const currentMgr = managers.find(m => m.id === form.managerId)
+    const mgrInDept = !deptId || !currentMgr || currentMgr.departmentId === deptId
+    setForm({ ...form, departmentId: deptId, managerId: mgrInDept ? form.managerId : '' })
+  }
 
   const filtered = employees.filter(emp => {
     const q = search.toLowerCase()
@@ -350,7 +351,7 @@ export default function Employees() {
     managers: employees.filter(e => e.role === 'MANAGER').length,
   }
 
-  // ── Insights ───────────────────────────────────────────────────────────────
+  // -- Insights ---------------------------------------------------------------
   const deptCounts = departments.map(d => ({
     name: d.name,
     count: employees.filter(e => e.departmentId === d.id).length,
@@ -360,7 +361,7 @@ export default function Employees() {
     !employees.some(e => e.managerId === m.id && e.role === 'EMPLOYEE')
   )
 
-  // ── CRUD ───────────────────────────────────────────────────────────────────
+  // -- CRUD -------------------------------------------------------------------
   const openCreate = () => {
     setEditTarget(null)
     setForm({ name: '', email: '', password: '', role: 'EMPLOYEE', departmentId: '', managerId: '' })
@@ -420,7 +421,7 @@ export default function Employees() {
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // -- Render -----------------------------------------------------------------
   return (
     <>
     <Layout>
@@ -428,7 +429,7 @@ export default function Employees() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground tracking-tight">Employees</h1>
+          <h1 className="text-page-title">Employees</h1>
           <p className="text-sm text-muted-foreground mt-1">{employees.length} total members</p>
         </div>
         {isAdmin && (
@@ -440,10 +441,10 @@ export default function Employees() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Total"     value={stats.total}    icon={Users}      iconCls="bg-primary/10 text-primary"       />
-        <SummaryCard label="Active"    value={stats.active}   icon={UserCheck}  iconCls="bg-emerald-100 text-emerald-600"  />
-        <SummaryCard label="Inactive"  value={stats.inactive} icon={UserX}      iconCls="bg-red-100 text-red-600"          />
-        <SummaryCard label="Managers"  value={stats.managers} icon={Briefcase}  iconCls="bg-amber-100 text-amber-600"      />
+        <StatCard title="Total"    value={stats.total}    icon={<Users size={16} />}     color="blue"   />
+        <StatCard title="Active"   value={stats.active}   icon={<UserCheck size={16} />} color="green"  />
+        <StatCard title="Inactive" value={stats.inactive} icon={<UserX size={16} />}     color="red"    />
+        <StatCard title="Managers" value={stats.managers} icon={<Briefcase size={16} />} color="amber"  />
       </div>
 
       {/* Insights */}
@@ -453,7 +454,7 @@ export default function Employees() {
             <div className="p-1.5 bg-amber-100 rounded-lg">
               <Lightbulb size={14} className="text-amber-600" />
             </div>
-            <h2 className="text-sm font-heading font-semibold text-foreground">People Insights</h2>
+            <h2 className="text-sm font-semibold text-foreground">People Insights</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {stats.inactive > 0 && (
@@ -544,11 +545,11 @@ export default function Employees() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left px-5 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider">Employee</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Department</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Reports To</th>
-                      <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                      <th className="text-left px-5 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Employee</th>
+                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
+                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Department</th>
+                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Reports To</th>
+                      <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                       <th className="px-4 py-3.5 w-10" />
                     </tr>
                   </thead>
@@ -566,7 +567,7 @@ export default function Employees() {
                             <div className="flex items-center gap-3">
                               <Avatar name={emp.name} size={36} online={emp.status === 'ACTIVE'} />
                               <div>
-                                <p className="font-heading font-semibold text-foreground text-sm leading-tight">{emp.name}</p>
+                                <p className="font-semibold text-foreground text-sm leading-tight">{emp.name}</p>
                                 <p className="text-xs text-muted-foreground">{emp.email}</p>
                               </div>
                             </div>
@@ -610,11 +611,11 @@ export default function Employees() {
                       <Avatar name={emp.name} size={40} online={emp.status === 'ACTIVE'} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <p className="font-heading font-semibold text-foreground text-sm truncate">{emp.name}</p>
+                          <p className="font-semibold text-foreground text-sm truncate">{emp.name}</p>
                           <RoleBadge role={emp.role} />
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{emp.email}</p>
-                        {mgr && <p className="text-xs text-muted-foreground mt-0.5">↳ {mgr.name}</p>}
+                        {mgr && <p className="text-xs text-muted-foreground mt-0.5">→ {mgr.name}</p>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <StatusDot status={emp.status} />
@@ -686,7 +687,7 @@ export default function Employees() {
           </div>
           <div>
             <label className="label">Department</label>
-            <select className="input" value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })}>
+            <select className="input" value={form.departmentId} onChange={e => handleDeptChange(e.target.value)}>
               <option value="">No department</option>
               {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
@@ -695,8 +696,11 @@ export default function Employees() {
             <label className="label">Manager</label>
             <select className="input" value={form.managerId} onChange={e => setForm({ ...form, managerId: e.target.value })}>
               <option value="">No manager</option>
-              {managers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {filteredManagers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
+            {form.departmentId && filteredManagers.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">No managers in this department yet.</p>
+            )}
           </div>
           {formError && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{formError}</div>

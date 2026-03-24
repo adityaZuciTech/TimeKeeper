@@ -10,6 +10,7 @@ import com.timekeeper.exception.ResourceNotFoundException;
 import com.timekeeper.repository.DepartmentRepository;
 import com.timekeeper.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class EmployeeService {
 
@@ -44,6 +46,14 @@ public class EmployeeService {
                 .managerId(request.getManagerId())
                 .status(Employee.EmployeeStatus.ACTIVE)
                 .build();
+
+        if (request.getManagerId() != null && department != null) {
+            Employee manager = employeeRepository.findById(request.getManagerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found: " + request.getManagerId()));
+            if (manager.getDepartment() != null && !manager.getDepartment().getId().equals(department.getId())) {
+                throw new BusinessException("Manager must belong to the same department as the employee");
+            }
+        }
 
         employee = employeeRepository.save(employee);
         return toResponse(employee);
@@ -82,6 +92,17 @@ public class EmployeeService {
             Department department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department not found: " + request.getDepartmentId()));
             employee.setDepartment(department);
+        }
+
+        // Validate manager belongs to same department
+        String resolvedManagerId = request.getManagerId() != null ? request.getManagerId() : employee.getManagerId();
+        Department resolvedDept = employee.getDepartment();
+        if (resolvedManagerId != null && resolvedDept != null) {
+            Employee manager = employeeRepository.findById(resolvedManagerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Manager not found: " + resolvedManagerId));
+            if (manager.getDepartment() != null && !manager.getDepartment().getId().equals(resolvedDept.getId())) {
+                throw new BusinessException("Manager must belong to the same department as the employee");
+            }
         }
 
         employee = employeeRepository.save(employee);

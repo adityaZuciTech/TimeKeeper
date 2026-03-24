@@ -6,6 +6,8 @@ import com.timekeeper.dto.response.ApiResponse;
 import com.timekeeper.dto.response.LeaveResponse;
 import com.timekeeper.entity.Employee;
 import com.timekeeper.service.LeaveService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Leaves", description = "Leave applications, approvals, and team leave management")
 @RestController
 @RequestMapping("/api/v1/leaves")
 @RequiredArgsConstructor

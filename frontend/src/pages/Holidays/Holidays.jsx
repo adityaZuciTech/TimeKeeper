@@ -7,7 +7,7 @@ import {
 } from '../../features/holidays/holidaySlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner } from '../../components/ui'
+import { LoadingSpinner, EmptyState } from '../../components/ui'
 import Modal from '../../components/Modal'
 import {
   Plus, CalendarDays, MoreVertical, Trash2,
@@ -93,7 +93,7 @@ function DateBadge({ date, type }) {
       <span className="text-[10px] font-semibold text-white/80 uppercase tracking-widest leading-none">
         {format(d, 'MMM')}
       </span>
-      <span className="text-2xl font-heading font-bold text-white leading-tight">
+      <span className="text-2xl font-bold text-white leading-tight">
         {format(d, 'd')}
       </span>
     </div>
@@ -143,7 +143,7 @@ function HolidayCard({ holiday, isAdmin, onDelete }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <p className="font-heading font-semibold text-foreground text-sm">{holiday.name}</p>
+          <p className="font-semibold text-foreground text-sm">{holiday.name}</p>
           <TypeBadge type={type} />
           {isToday && (
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
@@ -186,11 +186,11 @@ function NextHolidayCard({ holiday }) {
         <DateBadge date={holiday.date} type={type} />
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Next Holiday</p>
-          <p className="font-heading font-semibold text-foreground text-sm truncate">{holiday.name}</p>
+          <p className="font-semibold text-foreground text-sm truncate">{holiday.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{format(d, 'EEEE, MMM d')}</p>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-2xl font-heading font-bold text-foreground">{diff === 0 ? 'Today' : diff}</p>
+          <p className="text-2xl font-bold text-foreground">{diff === 0 ? 'Today' : diff}</p>
           {diff > 0 && <p className="text-[10px] text-muted-foreground">days away</p>}
         </div>
       </div>
@@ -204,7 +204,7 @@ function StatCard({ label, value, sub, Icon, iconCls }) {
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${iconCls}`}>
         <Icon size={15} />
       </div>
-      <p className="text-xl font-heading font-bold text-foreground">{value}</p>
+      <p className="text-xl font-bold text-foreground">{value}</p>
       <p className="text-xs text-foreground font-medium">{label}</p>
       {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
@@ -283,7 +283,7 @@ export default function Holidays() {
       {/* page header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Company Holidays</h1>
+          <h1 className="text-page-title">Company Holidays</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {holidays.length} holiday{holidays.length !== 1 ? 's' : ''} declared this year
           </p>
@@ -298,20 +298,12 @@ export default function Holidays() {
 
       {loading ? <LoadingSpinner /> : (
         holidays.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
-              <CalendarDays size={28} className="text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-heading font-semibold text-foreground">No holidays declared yet</p>
-              {isAdmin && <p className="text-sm text-muted-foreground mt-1">Click &ldquo;Add Holiday&rdquo; to get started</p>}
-            </div>
-            {isAdmin && (
-              <button className="btn-primary flex items-center gap-2" onClick={openModal}>
-                <Plus size={14} /> Add Holiday
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={CalendarDays}
+            title="No holidays declared yet"
+            description={isAdmin ? 'Click \"Add Holiday\" to get started' : 'No holidays have been added for this year.'}
+            action={isAdmin ? <button className="btn-primary flex items-center gap-2" onClick={openModal}><Plus size={14} /> Add Holiday</button> : undefined}
+          />
         ) : (
           <>
             {/* summary strip */}
@@ -346,7 +338,7 @@ export default function Holidays() {
               {Object.keys(grouped).sort((a, b) => a - b).map(monthIdx => (
                 <div key={monthIdx}>
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-[10px] font-heading font-bold text-muted-foreground uppercase tracking-widest">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                       {FULL_MONTHS[monthIdx]}
                     </span>
                     <span className="text-[10px] text-muted-foreground/50 font-medium">

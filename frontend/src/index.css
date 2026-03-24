@@ -1,14 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-.font-handwritten {
-  font-family: 'Meow Script', cursive;
-}
-
-/* ── Sidebar Scrollbar ─────────────────────────────────────────── */
+/* ── Sidebar Scrollbar ─────────────────────────────────────────────────── */
 .sidebar-scroll {
   scrollbar-width: none;
 }
@@ -30,16 +24,16 @@
   background: hsl(216 20% 35%);
 }
 
-/* ── Design Tokens ─────────────────────────────────────────────── */
+/* ── Design Tokens ──────────────────────────────────────────────────────── */
 @layer base {
   :root {
     /* Surfaces */
     --background:          0 0% 96.9%;
-    --foreground:          216 25% 22.7%;
+    --foreground:          216 25% 18%;
     --card:                0 0% 100%;
-    --card-foreground:     216 25% 22.7%;
+    --card-foreground:     216 25% 18%;
 
-    /* Brand */
+    /* Brand — Indigo / Blue (primary) */
     --primary:             229 100% 61.4%;
     --primary-foreground:  0 0% 100%;
 
@@ -47,19 +41,19 @@
     --secondary:           220 14% 92%;
     --secondary-foreground:216 25% 22.7%;
     --muted:               220 14% 94%;
-    --muted-foreground:    215 14% 46%;
+    --muted-foreground:    215 16% 50%;
 
-    /* Accent (blueprint blue tint) */
+    /* Accent */
     --accent:              229 100% 96%;
     --accent-foreground:   229 100% 45%;
 
     /* Feedback */
     --destructive:         0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --warning:             45 100% 50%;
+    --warning:             38 92% 50%;
     --warning-foreground:  28 75% 30%;
-    --success:             160 100% 33%;
-    --success-foreground:  160 100% 22%;
+    --success:             142 71% 45%;
+    --success-foreground:  142 76% 20%;
 
     /* Structure */
     --border:              220 13% 89%;
@@ -75,13 +69,24 @@
   }
 
   * { box-sizing: border-box; }
-
   html { scroll-behavior: smooth; }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* Typography scale */
+  .text-page-title    { @apply text-2xl font-semibold text-foreground tracking-tight; }
+  .text-section-title { @apply text-lg font-medium text-foreground; }
+  .text-card-title    { @apply text-base font-medium text-foreground; }
+  .text-body          { @apply text-sm text-muted-foreground; }
+  .text-label         { @apply text-xs text-muted-foreground; }
+  .text-date          { @apply text-sm text-muted-foreground font-medium; }
+  /* Section label � the "SECTION TITLE" all-caps divider used across pages */
+  .text-section-label { @apply text-[11px] font-semibold text-muted-foreground uppercase tracking-wider; }
 
   ::-webkit-scrollbar        { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track  { @apply bg-transparent; }
@@ -89,75 +94,140 @@
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.3); }
 }
 
-/* ── Component Classes ─────────────────────────────────────────── */
+/* ── Component Classes ──────────────────────────────────────────────────── */
 @layer components {
 
-  /* ── Buttons */
+  /* ── Buttons — with micro-interaction scales ── */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 h-10 px-4 py-2 rounded-md
-           text-sm font-heading font-medium
+    @apply inline-flex items-center justify-center gap-2 h-9 px-4 rounded-lg
+           text-sm font-medium
            bg-primary text-primary-foreground
            hover:bg-primary/90 active:bg-primary/80
-           transition-colors
+           hover:scale-[1.02] active:scale-[0.98]
+           transition-all duration-150
+           shadow-sm hover:shadow
            disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 h-10 px-4 py-2 rounded-md
-           text-sm font-heading font-medium
-           bg-card text-foreground border border-input
+    @apply inline-flex items-center justify-center gap-2 h-9 px-4 rounded-lg
+           text-sm font-medium
+           bg-card text-foreground border border-border
            hover:bg-secondary active:bg-secondary/80
-           transition-colors
+           hover:scale-[1.02] active:scale-[0.98]
+           transition-all duration-150
+           shadow-sm
            disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 h-10 px-4 py-2 rounded-md
-           text-sm font-heading font-medium
+    @apply inline-flex items-center justify-center gap-2 h-9 px-4 rounded-lg
+           text-sm font-medium
            bg-destructive text-destructive-foreground
            hover:bg-destructive/90
-           transition-colors
+           hover:scale-[1.02] active:scale-[0.98]
+           transition-all duration-150
            disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 h-10 px-3 py-2 rounded-md
-           text-sm font-heading font-medium
+    @apply inline-flex items-center justify-center gap-2 h-9 px-3 rounded-lg
+           text-sm font-medium
            hover:bg-accent hover:text-accent-foreground
-           transition-colors
+           transition-all duration-150
            disabled:opacity-50 disabled:pointer-events-none;
   }
 
-  /* ── Form */
+  /* ── Form ── */
   .input {
-    @apply h-10 w-full rounded-md border border-input bg-background px-3 py-2
+    @apply h-9 w-full rounded-lg border border-border bg-background px-3 py-2
            text-sm text-foreground placeholder:text-muted-foreground
-           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1
            disabled:opacity-50 disabled:pointer-events-none
-           transition-colors;
+           transition-colors duration-150;
   }
   textarea.input  { @apply h-auto; }
-  .label          { @apply block text-sm font-body font-medium text-foreground mb-1; }
+  .label          { @apply block text-sm font-medium text-foreground mb-1.5; }
 
-  /* ── Cards */
+  /* ── Cards — with hover lift ── */
   .card {
-    @apply bg-card rounded-lg border border-border shadow-sm p-6;
+    @apply bg-card rounded-xl border border-border shadow-sm p-5;
+  }
+  .card-hover {
+    @apply card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ease-in-out;
+  }
+  /* ── Data card ── */
+  .data-card {
+    @apply bg-card rounded-xl border border-border shadow-sm
+           hover:shadow-md hover:-translate-y-0.5
+           transition-all duration-200 ease-in-out;
   }
 
-  /* ── Status badges */
+  /* ── Status badges — semantic colors ── */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-           text-xs font-heading font-medium;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full
+           text-xs font-medium;
   }
-  .badge-draft     { @apply badge bg-warning/15 text-warning-foreground; }
-  .badge-submitted { @apply badge bg-success/15 text-success; }
-  .badge-active    { @apply badge bg-success/15 text-success; }
-  .badge-inactive  { @apply badge bg-muted text-muted-foreground; }
-  .badge-on-hold   { @apply badge bg-warning/15 text-warning-foreground; }
-  .badge-completed { @apply badge bg-primary/15 text-primary; }
+  /* Draft → gray */
+  .badge-draft {
+    @apply badge bg-gray-100 text-gray-600 border border-gray-200;
+  }
+  /* Submitted → blue */
+  .badge-submitted {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  /* Approved / Active → green */
+  .badge-approved,
+  .badge-active {
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  /* Rejected → red */
+  .badge-rejected,
+  .badge-cancelled {
+    @apply badge bg-red-50 text-red-700 border border-red-200;
+  }
+  /* Pending → amber/yellow */
+  .badge-pending,
+  .badge-on-hold {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  /* Inactive → gray muted */
+  .badge-inactive {
+    @apply badge bg-muted text-muted-foreground border border-border;
+  }
+  /* Completed → primary blue */
+  .badge-completed {
+    @apply badge bg-primary/10 text-primary border border-primary/20;
+  }
+  /* Overdue → red-orange */
+  .badge-overdue {
+    @apply badge bg-red-100 text-red-700 border border-red-200;
+  }
+  /* Auto-submitted → same as submitted */
+  .badge-auto-submitted {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
 
-  /* ── Tables */
+  /* ── Tables ── */
   .table-header {
-    @apply px-4 py-3 text-left text-xs font-heading font-medium
+    @apply px-4 py-3 text-left text-xs font-medium
            text-muted-foreground uppercase tracking-wider
-           bg-muted/50;
+           bg-muted/40;
   }
   .table-cell  { @apply px-4 py-3 text-sm text-foreground; }
+  .table-row {
+    @apply border-b border-border/50 hover:bg-gray-50/60
+           transition-colors duration-100;
+  }
+
+  /* ── Page transition wrapper ── */
+  .page-enter {
+    @apply animate-slide-up;
+  }
 }
+
+/* ── Utility: animate-submit-glow ─────────────────────────────────────── */
+.animate-submit-glow { animation: submit-glow 2s ease-in-out infinite; }
+
+
+.font-handwritten {
+  font-family: 'Meow Script', cursive;
+}
+

@@ -8,7 +8,11 @@ export const timesheetService = {
   getByWeek: (weekStartDate) => apiClient.get('/timesheets', { params: { weekStartDate } }),
   submit: (id) => apiClient.post(`/timesheets/${id}/submit`),
 
-  // Entries
+  // Approval workflow (MANAGER/ADMIN)
+  approve: (id) => apiClient.post(`/timesheets/${id}/approve`),
+  reject: (id, reason) => apiClient.post(`/timesheets/${id}/reject`, reason ? { reason } : {}),
+
+  // Entries — each returns the full updated TimesheetResponse (eliminates second GET)
   addEntry: (timesheetId, data) => apiClient.post(`/timesheets/${timesheetId}/entries`, data),
   getEntries: (timesheetId) => apiClient.get(`/timesheets/${timesheetId}/entries`),
   updateEntry: (entryId, data) => apiClient.put(`/timesheets/entries/${entryId}`, data),

@@ -8,12 +8,15 @@ import com.timekeeper.entity.Holiday;
 import com.timekeeper.entity.Leave;
 import com.timekeeper.exception.BusinessException;
 import com.timekeeper.exception.ResourceNotFoundException;
+import com.timekeeper.entity.Notification;
 import com.timekeeper.repository.EmployeeRepository;
 import com.timekeeper.repository.HolidayRepository;
 import com.timekeeper.repository.LeaveRepository;
 import com.timekeeper.service.LeaveService;
+import com.timekeeper.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class LeaveServiceImpl implements LeaveService {
     private final LeaveRepository leaveRepository;
     private final EmployeeRepository employeeRepository;
     private final HolidayRepository holidayRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -75,6 +79,16 @@ public class LeaveServiceImpl implements LeaveService {
 
         leave = leaveRepository.save(leave);
         log.info("Leave applied: {} by {}", leave.getId(), employeeId);
+
+        String managerId = employee.getManagerId();
+        if (managerId != null) {
+            notificationService.create(managerId,
+                    "Leave Request",
+                    employee.getName() + " has requested leave from " + leave.getStartDate() + " to " + leave.getEndDate(),
+                    Notification.NotificationType.LEAVE_APPLIED,
+                    Notification.NotificationSection.LEAVE);
+        }
+
         return toResponse(leave);
     }
 
@@ -102,10 +116,27 @@ public class LeaveServiceImpl implements LeaveService {
             throw new BusinessException("Only PENDING leaves can be approved");
         }
 
+        // MANAGER can only approve leaves of their own direct reports
+        Employee approver = employeeRepository.findById(approverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Approver not found"));
+        if (approver.getRole() == Employee.Role.MANAGER) {
+            String employeeManagerId = leave.getEmployee().getManagerId();
+            if (!approverId.equals(employeeManagerId)) {
+                throw new AccessDeniedException("Managers can only approve leaves for their direct reports");
+            }
+        }
+
         leave.setStatus(Leave.LeaveStatus.APPROVED);
         leave.setApprovedBy(approverId);
         leave = leaveRepository.save(leave);
         log.info("Leave {} approved by {}", leaveId, approverId);
+
+        notificationService.create(leave.getEmployee().getId(),
+                "Leave Approved",
+                "Your leave request from " + leave.getStartDate() + " to " + leave.getEndDate() + " has been approved.",
+                Notification.NotificationType.LEAVE_APPROVED,
+                Notification.NotificationSection.LEAVE);
+
         return toResponse(leave, resolveApproverNames(List.of(leave)));
     }
 
@@ -119,6 +150,16 @@ public class LeaveServiceImpl implements LeaveService {
             throw new BusinessException("Only PENDING leaves can be rejected");
         }
 
+        // MANAGER can only reject leaves of their own direct reports
+        Employee approver = employeeRepository.findById(approverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Approver not found"));
+        if (approver.getRole() == Employee.Role.MANAGER) {
+            String employeeManagerId = leave.getEmployee().getManagerId();
+            if (!approverId.equals(employeeManagerId)) {
+                throw new AccessDeniedException("Managers can only reject leaves for their direct reports");
+            }
+        }
+
         leave.setStatus(Leave.LeaveStatus.REJECTED);
         leave.setApprovedBy(approverId);
         if (request != null && request.getNote() != null) {
@@ -126,6 +167,13 @@ public class LeaveServiceImpl implements LeaveService {
         }
         leave = leaveRepository.save(leave);
         log.info("Leave {} rejected by {}", leaveId, approverId);
+
+        notificationService.create(leave.getEmployee().getId(),
+                "Leave Rejected",
+                "Your leave request from " + leave.getStartDate() + " to " + leave.getEndDate() + " has been rejected.",
+                Notification.NotificationType.LEAVE_REJECTED,
+                Notification.NotificationSection.LEAVE);
+
         return toResponse(leave, resolveApproverNames(List.of(leave)));
     }
 

@@ -1,0 +1,16 @@
+﻿
+Running 11 tests using 3 workers
+
+  Γ£ô   3 [chromium] ΓÇ║ tests\e2e\general.spec.js:7:3 ΓÇ║ 404 not found ΓÇ║ shows 404 page for unknown routes (unauthenticated) (4.2s)
+  Γ£ô   2 [chromium] ΓÇ║ tests\e2e\auth.spec.js:14:3 ΓÇ║ Authentication ΓÇ║ shows login form (4.2s)
+  Γ£ô   1 [chromium] ΓÇ║ tests\e2e\timesheets.spec.js:16:3 ΓÇ║ Timesheets ΓÇ║ shows timesheets page with create button (5.4s)
+  Γ£ô   4 [chromium] ΓÇ║ tests\e2e\general.spec.js:24:3 ΓÇ║ Leaves ΓÇ║ shows my leaves page (2.9s)
+  Γ£ô   6 [chromium] ΓÇ║ tests\e2e\timesheets.spec.js:22:3 ΓÇ║ Timesheets ΓÇ║ new timesheet page shows week selector (2.8s)
+  Γ£ô   5 [chromium] ΓÇ║ tests\e2e\auth.spec.js:21:3 ΓÇ║ Authentication ΓÇ║ shows error on invalid credentials (4.2s)
+  Γ£ô   7 [chromium] ΓÇ║ tests\e2e\general.spec.js:29:3 ΓÇ║ Leaves ΓÇ║ apply leave button is present (2.1s)
+  Γ£ô   9 [chromium] ΓÇ║ tests\e2e\auth.spec.js:30:3 ΓÇ║ Authentication ΓÇ║ redirects authenticated user to dashboard (2.1s)
+  Γ£ô  10 [chromium] ΓÇ║ tests\e2e\general.spec.js:46:3 ΓÇ║ Reports ΓÇ║ organization page accessible by admin (2.1s)
+  Γ£ô   8 [chromium] ΓÇ║ tests\e2e\timesheets.spec.js:31:3 ΓÇ║ Timesheets ΓÇ║ navigating to non-existent timesheet shows not-found or redirects (3.9s)
+  Γ£ô  11 [chromium] ΓÇ║ tests\e2e\auth.spec.js:37:3 ΓÇ║ Authentication ΓÇ║ logout clears session and redirects to login (2.0s)
+
+  11 passed (15.7s)

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { fetchTeam, selectTeam } from '../../features/employees/employeeSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
+import { markSectionRead } from '../../features/notifications/notificationSlice'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
 import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
@@ -110,7 +111,7 @@ function StatCard({ label, value, sub, Icon, iconCls, highlight }) {
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${iconCls}`}>
         <Icon size={15} />
       </div>
-      <p className="text-xl font-heading font-bold text-foreground">{value}</p>
+      <p className="text-xl font-bold text-foreground">{value}</p>
       <p className="text-xs font-medium text-foreground">{label}</p>
       {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
@@ -128,11 +129,11 @@ function MemberCard({ emp, hours, onView }) {
       {/* top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-heading font-bold flex-shrink-0 ${avatarColor(emp.name)}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarColor(emp.name)}`}>
             {initials(emp.name)}
           </div>
           <div className="min-w-0">
-            <p className="font-heading font-semibold text-foreground text-sm truncate">{emp.name}</p>
+            <p className="font-semibold text-foreground text-sm truncate">{emp.name}</p>
             <p className="text-[11px] text-muted-foreground truncate">{emp.email}</p>
           </div>
         </div>
@@ -155,7 +156,7 @@ function MemberCard({ emp, hours, onView }) {
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-heading font-bold text-foreground tabular-nums">{hours.toFixed(1)}</span>
+            <span className="text-2xl font-bold text-foreground tabular-nums">{hours.toFixed(1)}</span>
             <span className="text-xs text-muted-foreground">/ 40h</span>
           </div>
           <span className="text-xs font-medium text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
@@ -207,6 +208,8 @@ export default function Team() {
     load()
   }, [dispatch, user.id])
 
+  useEffect(() => { dispatch(markSectionRead('TEAM')) }, [dispatch])
+
   const getHours = (empId) => {
     const found = utilization.find(u => u.employeeId === empId)
     return found ? Number(found.hoursLogged) : 0
@@ -246,7 +249,7 @@ export default function Team() {
       {/* header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">My Team</h1>
+          <h1 className="text-page-title">My Team</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Week of {format(getCurrentMonday(), 'MMMM d, yyyy')}
           </p>

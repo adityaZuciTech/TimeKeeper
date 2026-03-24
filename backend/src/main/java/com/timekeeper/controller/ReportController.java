@@ -6,6 +6,7 @@ import com.timekeeper.dto.response.ReportResponse;
 import com.timekeeper.entity.Employee;
 import com.timekeeper.service.PdfReportService;
 import com.timekeeper.service.ReportService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Reports", description = "Team utilization, project effort, and PDF export reports")
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor

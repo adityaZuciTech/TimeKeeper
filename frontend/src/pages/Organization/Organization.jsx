@@ -79,7 +79,7 @@ function StatCardPremium({ title, value, subtitle, trend, sparkData, icon: Icon,
         {sparkData && <SparkLine data={sparkData} color={sparkColor} />}
       </div>
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{title}</p>
-      <p className="text-3xl font-heading font-bold text-foreground">{value}</p>
+      <p className="text-3xl font-bold text-foreground">{value}</p>
       {trend !== undefined && trend !== null ? (
         <p className={`text-xs mt-1.5 flex items-center gap-1 font-medium
           ${pos ? 'text-emerald-600' : neg ? 'text-red-500' : 'text-muted-foreground'}`}>
@@ -399,7 +399,7 @@ export default function Organization() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground tracking-tight">
+          <h1 className="text-page-title">
             Organization Overview
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -532,7 +532,7 @@ export default function Organization() {
             <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-sm p-6" ref={trendChartRef}>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="text-base font-heading font-semibold text-foreground">Weekly Hours Trend</h2>
+                  <h2 className="text-base font-semibold text-foreground">Weekly Hours Trend</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">Total hours logged across all departments</p>
                 </div>
                 <span className="px-3 py-1.5 bg-primary/10 rounded-lg text-xs font-medium text-primary">
@@ -564,7 +564,7 @@ export default function Organization() {
 
             {/* Donut — department distribution */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6" ref={pieChartRef}>
-              <h2 className="text-base font-heading font-semibold text-foreground mb-0.5">Department Distribution</h2>
+              <h2 className="text-base font-semibold text-foreground mb-0.5">Department Distribution</h2>
               <p className="text-xs text-muted-foreground mb-4">Hours by department</p>
 
               {donutData.length === 0 ? (
@@ -619,7 +619,7 @@ export default function Organization() {
                 <div className="p-1.5 bg-amber-100 rounded-lg">
                   <Lightbulb size={15} className="text-amber-600" />
                 </div>
-                <h2 className="text-base font-heading font-semibold text-foreground">Insights</h2>
+                <h2 className="text-base font-semibold text-foreground">Insights</h2>
               </div>
               {insights.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No data available.</p>
@@ -634,7 +634,7 @@ export default function Organization() {
             <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-sm p-6">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h2 className="text-base font-heading font-semibold text-foreground">Department Utilization</h2>
+                  <h2 className="text-base font-semibold text-foreground">Department Utilization</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">Click column headers to sort</p>
                 </div>
               </div>
@@ -652,7 +652,7 @@ export default function Organization() {
                       ].map(({ col, label, hidden }) => (
                         <th
                           key={label}
-                          className={`text-left pb-3 pr-4 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider ${hidden ? 'hidden md:table-cell' : ''}`}
+                          className={`text-left pb-3 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wider ${hidden ? 'hidden md:table-cell' : ''}`}
                         >
                           {col ? (
                             <button

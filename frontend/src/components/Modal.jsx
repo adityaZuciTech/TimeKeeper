@@ -31,7 +31,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
         {/* Panel */}
         <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md z-10 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h3 id={titleId} className="text-base font-heading font-semibold text-foreground">{title}</h3>
+            <h3 id={titleId} className="text-base font-semibold text-foreground">{title}</h3>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

@@ -8,6 +8,8 @@ import com.timekeeper.dto.response.TimeEntryResponse;
 import com.timekeeper.dto.response.TimesheetResponse;
 import com.timekeeper.entity.Employee;
 import com.timekeeper.service.TimesheetService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -20,7 +22,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.AccessDeniedException;
 
+@Tag(name = "Timesheets", description = "Create, retrieve, and submit weekly timesheets and time entries")
 @RestController
 @RequestMapping("/api/v1/timesheets")
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ public class TimesheetController {
     private final TimesheetService timesheetService;
 
     // Dashboard: last 5 timesheets
+    @Operation(summary = "Get my recent timesheets", description = "Returns the 5 most recent timesheets for the current user")
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, List<TimesheetResponse>>>> getMyTimesheets(
@@ -38,6 +43,7 @@ public class TimesheetController {
     }
 
     // Full paginated list of all my timesheets
+    @Operation(summary = "Get all my timesheets (paginated)")
     @GetMapping("/my/all")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAllMyTimesheets(
@@ -49,6 +55,7 @@ public class TimesheetController {
     }
 
     // Create timesheet for a week
+    @Operation(summary = "Create or get timesheet for a week", description = "Idempotent: returns existing timesheet if one already exists for the week")
     @PostMapping
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<TimesheetResponse>> create(
@@ -68,14 +75,22 @@ public class TimesheetController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // Get by ID
+    // Get by ID — employees can only view their own timesheets
     @GetMapping("/{timesheetId}")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<TimesheetResponse>> getById(@PathVariable String timesheetId) {
-        return ResponseEntity.ok(ApiResponse.success(timesheetService.getById(timesheetId)));
+    public ResponseEntity<ApiResponse<TimesheetResponse>> getById(
+            @PathVariable String timesheetId,
+            @AuthenticationPrincipal Employee currentUser) {
+        TimesheetResponse response = timesheetService.getById(timesheetId);
+        if (currentUser.getRole() == Employee.Role.EMPLOYEE
+                && !response.getEmployeeId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("Access denied");
+        }
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     // Submit timesheet
+    @Operation(summary = "Submit timesheet for approval")
     @PostMapping("/{timesheetId}/submit")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<TimesheetResponse>> submit(
@@ -85,14 +100,14 @@ public class TimesheetController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // Add entry
+    // Add entry — returns full updated timesheet (eliminates second client-side GET)
     @PostMapping("/{timesheetId}/entries")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<TimeEntryResponse>> addEntry(
+    public ResponseEntity<ApiResponse<TimesheetResponse>> addEntry(
             @PathVariable String timesheetId,
             @AuthenticationPrincipal Employee currentUser,
             @Valid @RequestBody AddTimeEntryRequest request) {
-        TimeEntryResponse response = timesheetService.addEntry(timesheetId, currentUser.getId(), request);
+        TimesheetResponse response = timesheetService.addEntry(timesheetId, currentUser.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
@@ -104,24 +119,50 @@ public class TimesheetController {
         return ResponseEntity.ok(ApiResponse.success(timesheetService.getEntries(timesheetId)));
     }
 
-    // Update entry
+    // Update entry — returns full updated timesheet
     @PutMapping("/entries/{entryId}")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<TimeEntryResponse>> updateEntry(
+    public ResponseEntity<ApiResponse<TimesheetResponse>> updateEntry(
             @PathVariable String entryId,
             @AuthenticationPrincipal Employee currentUser,
             @Valid @RequestBody UpdateTimeEntryRequest request) {
-        TimeEntryResponse response = timesheetService.updateEntry(entryId, currentUser.getId(), request);
+        TimesheetResponse response = timesheetService.updateEntry(entryId, currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // Delete entry
+    // Delete entry — returns full updated timesheet
     @DeleteMapping("/entries/{entryId}")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteEntry(
+    public ResponseEntity<ApiResponse<TimesheetResponse>> deleteEntry(
             @PathVariable String entryId,
             @AuthenticationPrincipal Employee currentUser) {
-        timesheetService.deleteEntry(entryId, currentUser.getId());
-        return ResponseEntity.ok(ApiResponse.success("Entry deleted", null));
+        TimesheetResponse response = timesheetService.deleteEntry(entryId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // Approve timesheet (MANAGER/ADMIN only)
+    @Operation(summary = "Approve a submitted timesheet")
+    @PostMapping("/{timesheetId}/approve")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<TimesheetResponse>> approveTimesheet(
+            @PathVariable String timesheetId,
+            @AuthenticationPrincipal Employee currentUser) {
+        TimesheetResponse response = timesheetService.approveTimesheet(
+                timesheetId, currentUser.getId(), currentUser.getRole());
+        return ResponseEntity.ok(ApiResponse.success("Timesheet approved", response));
+    }
+
+    // Reject timesheet (MANAGER/ADMIN only)
+    @Operation(summary = "Reject a submitted timesheet")
+    @PostMapping("/{timesheetId}/reject")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<TimesheetResponse>> rejectTimesheet(
+            @PathVariable String timesheetId,
+            @AuthenticationPrincipal Employee currentUser,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        TimesheetResponse response = timesheetService.rejectTimesheet(
+                timesheetId, currentUser.getId(), currentUser.getRole(), reason);
+        return ResponseEntity.ok(ApiResponse.success("Timesheet rejected", response));
     }
 }

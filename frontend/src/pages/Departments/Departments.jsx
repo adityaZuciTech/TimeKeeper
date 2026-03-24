@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   fetchDepartments, createDepartment, updateDepartment, updateDepartmentStatus,
@@ -18,7 +18,7 @@ import {
   Zap, AlertTriangle, TrendingUp, Eye,
 } from 'lucide-react'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// --- Constants ----------------------------------------------------------------
 const PALETTE = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
 function deptColor(name = '') {
   return PALETTE[(name.charCodeAt(0) || 0) % PALETTE.length]
@@ -33,7 +33,7 @@ function getMonday() {
   return format(m, 'yyyy-MM-dd')
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// --- Avatar -------------------------------------------------------------------
 const AVATAR_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 function Avatar({ name = '', size = 28, idx = 0 }) {
   const bg       = AVATAR_COLORS[idx % AVATAR_COLORS.length]
@@ -72,7 +72,7 @@ function AvatarGroup({ people = [], max = 3 }) {
   )
 }
 
-// ─── Smart insight tag ────────────────────────────────────────────────────────
+// --- Smart insight tag --------------------------------------------------------
 function InsightTag({ dept, utilPct, allDepts, employees, utilMap }) {
   const getUtil = (d) => {
     const count = employees.filter(e => e.departmentId === d.id).length
@@ -96,7 +96,7 @@ function InsightTag({ dept, utilPct, allDepts, employees, utilMap }) {
   return null
 }
 
-// ─── 3-dot menu ───────────────────────────────────────────────────────────────
+// --- 3-dot menu ---------------------------------------------------------------
 function DeptMenu({ dept, onView, onEdit, onToggle }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -144,7 +144,7 @@ function DeptMenu({ dept, onView, onEdit, onToggle }) {
   )
 }
 
-// ─── Department card ─────────────────────────────────────────────────────────
+// --- Department card ---------------------------------------------------------
 function DeptCard({ dept, allDepts, employees, utilMap, onView, onEdit, onToggle }) {
   const color     = deptColor(dept.name)
   const members   = employees.filter(e => e.departmentId === dept.id)
@@ -172,7 +172,7 @@ function DeptCard({ dept, allDepts, employees, utilMap, onView, onEdit, onToggle
               {dept.name[0].toUpperCase()}
             </div>
             <div className="min-w-0">
-              <h3 className="font-heading font-semibold text-foreground text-sm leading-tight truncate">{dept.name}</h3>
+              <h3 className="font-semibold text-foreground text-sm leading-tight truncate">{dept.name}</h3>
               {managers.length > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-0.5">Led by {managers[0].name}</p>
               )}
@@ -195,15 +195,15 @@ function DeptCard({ dept, allDepts, employees, utilMap, onView, onEdit, onToggle
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="bg-muted/50 rounded-xl p-2.5 text-center">
-            <p className="text-base font-heading font-bold text-foreground tabular-nums">{members.length}</p>
+            <p className="text-base font-bold text-foreground tabular-nums">{members.length}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Members</p>
           </div>
           <div className="bg-muted/50 rounded-xl p-2.5 text-center">
-            <p className="text-base font-heading font-bold text-foreground tabular-nums">{hours.toFixed(0)}h</p>
+            <p className="text-base font-bold text-foreground tabular-nums">{hours.toFixed(0)}h</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">This week</p>
           </div>
           <div className="bg-muted/50 rounded-xl p-2.5 text-center">
-            <p className="text-base font-heading font-bold tabular-nums" style={{ color: barColor }}>{utilPct}%</p>
+            <p className="text-base font-bold tabular-nums" style={{ color: barColor }}>{utilPct}%</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Utilization</p>
           </div>
         </div>
@@ -232,7 +232,7 @@ function DeptCard({ dept, allDepts, employees, utilMap, onView, onEdit, onToggle
   )
 }
 
-// ─── Department Drawer ────────────────────────────────────────────────────────
+// --- Department Drawer --------------------------------------------------------
 function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
   const [deptEmps,    setDeptEmps]    = useState(null)
   const [empsLoading, setEmpsLoading] = useState(false)
@@ -271,7 +271,7 @@ function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
                 {dept.name[0].toUpperCase()}
               </div>
               <div>
-                <h2 className="text-lg font-heading font-bold text-white leading-tight">{dept.name}</h2>
+                <h2 className="text-lg font-bold text-white leading-tight">{dept.name}</h2>
                 {managers.length > 0 && (
                   <p className="text-sm text-white/75 mt-0.5">Led by {managers[0].name}</p>
                 )}
@@ -320,17 +320,17 @@ function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-muted/50 rounded-xl p-4 text-center">
               <Users size={16} className="text-muted-foreground mx-auto mb-1.5" />
-              <p className="text-xl font-heading font-bold text-foreground tabular-nums">{members.length}</p>
+              <p className="text-xl font-bold text-foreground tabular-nums">{members.length}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Members</p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4 text-center">
               <Clock size={16} className="text-muted-foreground mx-auto mb-1.5" />
-              <p className="text-xl font-heading font-bold text-foreground tabular-nums">{hours.toFixed(0)}h</p>
+              <p className="text-xl font-bold text-foreground tabular-nums">{hours.toFixed(0)}h</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">This Week</p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4 text-center">
               <Activity size={16} className="text-muted-foreground mx-auto mb-1.5" />
-              <p className="text-xl font-heading font-bold tabular-nums" style={{ color: barColor }}>{utilPct}%</p>
+              <p className="text-xl font-bold tabular-nums" style={{ color: barColor }}>{utilPct}%</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Utilization</p>
             </div>
           </div>
@@ -341,14 +341,14 @@ function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${utilPct}%`, background: barColor }} />
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
-              {utilPct >= 80 ? 'High utilization — team is at capacity' : utilPct >= 50 ? 'Moderate utilization' : 'Low utilization this week'}
+              {utilPct >= 80 ? 'High utilization � team is at capacity' : utilPct >= 50 ? 'Moderate utilization' : 'Low utilization this week'}
             </p>
           </div>
 
           {/* Employee list */}
           <div>
-            <h3 className="text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Team Members {displayEmps.length > 0 && `· ${displayEmps.length}`}
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Team Members {displayEmps.length > 0 && `� ${displayEmps.length}`}
             </h3>
             {empsLoading ? (
               <div className="space-y-2 animate-pulse">
@@ -384,7 +384,7 @@ function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
   )
 }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
+// --- Summary Card -------------------------------------------------------------
 function SummaryCard({ label, value, icon: Icon, color, sub }) {
   return (
     <div className="bg-card rounded-2xl border border-border p-5 flex items-start gap-4 shadow-sm">
@@ -392,7 +392,7 @@ function SummaryCard({ label, value, icon: Icon, color, sub }) {
         <Icon size={18} style={{ color }} />
       </div>
       <div className="min-w-0">
-        <p className="text-2xl font-heading font-bold text-foreground tabular-nums leading-none">{value}</p>
+        <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{value}</p>
         <p className="text-sm text-muted-foreground mt-1">{label}</p>
         {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
       </div>
@@ -400,7 +400,7 @@ function SummaryCard({ label, value, icon: Icon, color, sub }) {
   )
 }
 
-// ─── Insights panel ───────────────────────────────────────────────────────────
+// --- Insights panel -----------------------------------------------------------
 function InsightsPanel({ depts, employees, utilMap }) {
   const active   = depts.filter(d => d.status === 'ACTIVE')
   const inactive = depts.filter(d => d.status !== 'ACTIVE')
@@ -428,7 +428,7 @@ function InsightsPanel({ depts, employees, utilMap }) {
   if (largestDept?.count > 0)
     insights.push({ icon: Users, color: 'text-primary', text: `${largestDept.name} is the largest team with ${largestDept.count} members` })
   if (lowDept && lowDept.id !== topDept?.id && lowDept.pct < 30)
-    insights.push({ icon: TrendingUp, color: 'text-muted-foreground', text: `${lowDept.name} has low activity — only ${lowDept.pct}% utilized` })
+    insights.push({ icon: TrendingUp, color: 'text-muted-foreground', text: `${lowDept.name} has low activity � only ${lowDept.pct}% utilized` })
 
   if (!insights.length) return null
 
@@ -436,7 +436,7 @@ function InsightsPanel({ depts, employees, utilMap }) {
     <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <Lightbulb size={15} className="text-amber-500" />
-        <h3 className="text-sm font-heading font-semibold text-foreground">Insights</h3>
+        <h3 className="text-sm font-semibold text-foreground">Insights</h3>
       </div>
       <ul className="space-y-2.5">
         {insights.map((ins, i) => (
@@ -450,7 +450,7 @@ function InsightsPanel({ depts, employees, utilMap }) {
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// --- Main component -----------------------------------------------------------
 export default function Departments() {
   const dispatch    = useDispatch()
   const departments = useSelector(selectDepartments)
@@ -476,10 +476,10 @@ export default function Departments() {
         rows.forEach(r => { map[r.departmentId] = r.totalHours ?? 0 })
         setUtilMap(map)
       })
-      .catch(() => {/* silently fail — utilization is enhancement only */})
+      .catch(() => {/* silently fail � utilization is enhancement only */})
   }, [dispatch])
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
+  // -- Filtering --------------------------------------------------------------
   const filtered = departments.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusTab === 'ALL' || d.status === statusTab
@@ -493,12 +493,12 @@ export default function Departments() {
     return matchSearch && matchStatus && matchSize
   })
 
-  // ── Summary stats ──────────────────────────────────────────────────────────
+  // -- Summary stats ----------------------------------------------------------
   const totalActive   = departments.filter(d => d.status === 'ACTIVE').length
   const totalInactive = departments.filter(d => d.status !== 'ACTIVE').length
   const totalEmps     = employees.length
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // -- Actions ----------------------------------------------------------------
   const openCreate = () => {
     setEditTarget(null)
     setForm({ name: '', description: '' })
@@ -542,12 +542,12 @@ export default function Departments() {
     <Layout>
       <div className="space-y-6">
 
-        {/* ── Page header ─────────────────────────────────────────────────── */}
+        {/* -- Page header --------------------------------------------------- */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Departments</h1>
+            <h1 className="text-page-title">Departments</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {departments.length} department{departments.length !== 1 ? 's' : ''} · {totalEmps} total employees
+              {departments.length} department{departments.length !== 1 ? 's' : ''} � {totalEmps} total employees
             </p>
           </div>
           <button className="btn-primary flex-shrink-0" onClick={openCreate}>
@@ -555,7 +555,7 @@ export default function Departments() {
           </button>
         </div>
 
-        {/* ── Summary cards ───────────────────────────────────────────────── */}
+        {/* -- Summary cards ------------------------------------------------- */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <SummaryCard label="Total Departments" value={departments.length} icon={Building2} color="#6366F1" />
           <SummaryCard label="Active"            value={totalActive}        icon={Activity}  color="#10B981" />
@@ -563,17 +563,17 @@ export default function Departments() {
           <SummaryCard label="Total Employees"   value={totalEmps}          icon={Users}     color="#F59E0B" />
         </div>
 
-        {/* ── Insights ────────────────────────────────────────────────────── */}
+        {/* -- Insights ------------------------------------------------------ */}
         <InsightsPanel depts={departments} employees={employees} utilMap={utilMap} />
 
-        {/* ── Filters ─────────────────────────────────────────────────────── */}
+        {/* -- Filters ------------------------------------------------------- */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-shrink-0 w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               className="input pl-9 h-9 text-sm w-full"
-              placeholder="Search departments…"
+              placeholder="Search departments�"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -609,7 +609,7 @@ export default function Departments() {
             >
               <option value="ALL">All sizes</option>
               <option value="SMALL">Small (&lt;5)</option>
-              <option value="MEDIUM">Medium (5–15)</option>
+              <option value="MEDIUM">Medium (5�15)</option>
               <option value="LARGE">Large (&gt;15)</option>
             </select>
             <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -627,7 +627,7 @@ export default function Departments() {
           <span className="ml-auto text-xs text-muted-foreground">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
         </div>
 
-        {/* ── Grid ────────────────────────────────────────────────────────── */}
+        {/* -- Grid ---------------------------------------------------------- */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1,2,3,4,5,6].map(i => <div key={i} className="h-52 bg-card rounded-2xl border border-border animate-pulse" />)}
@@ -663,7 +663,7 @@ export default function Departments() {
         )}
       </div>
 
-      {/* ── Drawer ──────────────────────────────────────────────────────────── */}
+      {/* -- Drawer ------------------------------------------------------------ */}
       {drawerDept && (
         <DeptDrawer
           dept={drawerDept}
@@ -675,7 +675,7 @@ export default function Departments() {
         />
       )}
 
-      {/* ── Create / Edit Modal ─────────────────────────────────────────────── */}
+      {/* -- Create / Edit Modal ----------------------------------------------- */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editTarget ? 'Edit Department' : 'Add Department'}>
         <div className="space-y-4">
           <div>

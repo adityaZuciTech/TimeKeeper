@@ -20,7 +20,7 @@ export default function NewTimesheet() {
   const currentWeekMonday = getMonday(new Date())
   const isCurrentWeek = format(selectedWeek, 'yyyy-MM-dd') === format(currentWeekMonday, 'yyyy-MM-dd')
 
-  const weekLabel = `${format(selectedWeek, 'MMM d')} – ${format(new Date(selectedWeek.getTime() + 4 * 86400000), 'MMM d, yyyy')}`
+  const weekLabel = `${format(selectedWeek, 'MMM d')} - ${format(new Date(selectedWeek.getTime() + 4 * 86400000), 'MMM d, yyyy')}`
 
   const goBack    = () => setSelectedWeek(prev => subWeeks(prev, 1))
   const goForward = () => {
@@ -49,7 +49,7 @@ export default function NewTimesheet() {
               <Calendar size={20} className="text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-heading font-semibold text-foreground">New Timesheet</h2>
+              <h2 className="text-lg font-semibold text-foreground">New Timesheet</h2>
               <p className="text-sm text-muted-foreground">Select a week to log time</p>
             </div>
           </div>

@@ -35,7 +35,7 @@ export default function TeamMemberTimesheets() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           Back to Team
         </button>
-        <h1 className="text-2xl font-heading font-bold text-foreground">
+        <h1 className="text-page-title">
           {employee ? `${employee.name}'s Timesheets` : 'Timesheets'}
         </h1>
         {employee && (
@@ -61,15 +61,15 @@ export default function TeamMemberTimesheets() {
                 <tbody className="divide-y divide-gray-50">
                   {timesheets.map(ts => (
                     <tr key={ts.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="table-cell font-body font-medium text-foreground">
-                        {format(new Date(ts.weekStartDate), 'MMM d')} – {format(new Date(ts.weekEndDate), 'MMM d, yyyy')}
+                      <td className="table-cell font-medium text-foreground">
+                        {format(new Date(ts.weekStartDate), 'MMM d')} - {format(new Date(ts.weekEndDate), 'MMM d, yyyy')}
                       </td>
                       <td className="table-cell">{Number(ts.totalHours || 0).toFixed(1)} hrs</td>
                       <td className="table-cell"><StatusBadge status={ts.status} /></td>
                       <td className="table-cell">
                         <button
                           onClick={() => navigate(`/timesheets/${ts.id}`)}
-                          className="text-primary hover:text-primary/80 text-sm font-heading font-medium"
+                          className="text-primary hover:text-primary/80 text-sm font-medium"
                         >
                           View
                         </button>

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { login, selectIsAuthenticated, selectAuthError, selectAuthLoading, clearError } from '../../features/auth/authSlice'
@@ -59,11 +59,11 @@ export default function Login() {
           <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
             <Clock size={18} className="text-primary-foreground" />
           </div>
-          <span className="text-[15px] font-heading font-semibold text-sidebar-foreground tracking-tight">TimeKeeper</span>
+          <span className="text-[15px] font-semibold text-sidebar-foreground tracking-tight">TimeKeeper</span>
         </div>
 
         <div className="relative z-10">
-          <h1 className="text-4xl font-heading font-bold text-sidebar-foreground leading-tight mb-4">
+          <h1 className="text-4xl font-bold text-sidebar-foreground leading-tight mb-4">
             Track time.<br />
             <span className="text-primary">Work smarter.</span>
           </h1>
@@ -78,7 +78,7 @@ export default function Login() {
                   <Icon size={18} />
                 </div>
                 <div>
-                  <p className="text-sidebar-foreground font-heading font-medium text-sm">{label}</p>
+                  <p className="text-sidebar-foreground font-medium text-sm">{label}</p>
                   <p className="text-sidebar-muted text-xs mt-0.5">{desc}</p>
                 </div>
               </div>
@@ -98,12 +98,12 @@ export default function Login() {
             <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
               <Clock size={18} className="text-primary-foreground" />
             </div>
-            <span className="font-heading font-semibold text-foreground text-lg">TimeKeeper</span>
+            <span className="font-semibold text-foreground text-lg">TimeKeeper</span>
           </div>
 
           <div className="card">
             <div className="mb-6">
-              <h2 className="text-2xl font-heading font-bold text-foreground tracking-tight">Welcome back</h2>
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h2>
               <p className="text-muted-foreground text-sm mt-1">Sign in to your account to continue</p>
             </div>
 
@@ -124,7 +124,7 @@ export default function Login() {
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    className="input pr-11" placeholder="••••••••"
+                    className="input pr-11" placeholder="Enter your password"
                     value={password} onChange={(e) => setPassword(e.target.value)}
                     required
                   />
@@ -150,7 +150,7 @@ export default function Login() {
                 ) : 'Sign in'}
               </button>
 
-              {/* Inline error — persists until user retries (heuristic #9) */}
+              {/* Inline error � persists until user retries (heuristic #9) */}
               {inlineError && (
                 <div className="flex items-start gap-2.5 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg" role="alert">
                   <AlertCircle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
@@ -160,7 +160,7 @@ export default function Login() {
             </form>
 
             <div className="mt-6 pt-5 border-t border-border">
-              <p className="text-[11px] font-heading font-medium text-muted-foreground uppercase tracking-wider mb-3">Demo accounts - click to fill</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Demo accounts - click to fill</p>
               <div className="space-y-1">
                 {demoAccounts.map(({ role, email: e, password: p }) => (
                   <button
@@ -168,7 +168,7 @@ export default function Login() {
                     onClick={() => fillDemo(e, p)}
                     className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition-colors group flex items-center justify-between"
                   >
-                    <span className="text-xs font-heading font-medium text-foreground group-hover:text-accent-foreground">{role}</span>
+                    <span className="text-xs font-medium text-foreground group-hover:text-accent-foreground">{role}</span>
                     <span className="text-xs text-muted-foreground">{e}</span>
                   </button>
                 ))}

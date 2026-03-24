@@ -5,12 +5,13 @@ import {
   fetchMyTimesheets, createTimesheet,
   selectMyTimesheets, selectTimesheetsLoading,
 } from '../../features/timesheets/timesheetSlice'
+import { markSectionRead } from '../../features/notifications/notificationSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
+import { StatCard, EmptyState, SkeletonRows } from '../../components/ui'
 import { format, isThisWeek, isPast, parseISO, getWeek } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Clock, CheckCircle2, FileEdit, TrendingUp, TrendingDown,
+  Clock, CheckCircle2, FileEdit, TrendingUp,
   AlertTriangle, Calendar, Plus, ArrowRight, Flame,
 } from 'lucide-react'
 
@@ -40,11 +41,11 @@ function getEffectiveStatus(ts) {
 // ─── config ───────────────────────────────────────────────────────────────────
 
 const STATUS_CFG = {
-  DRAFT:     { label: 'Draft',     badge: 'bg-amber-100 text-amber-700 border-amber-200',    dot: 'bg-amber-500',   Icon: FileEdit },
-  SUBMITTED: { label: 'Submitted', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', Icon: CheckCircle2 },
-  APPROVED:  { label: 'Approved',  badge: 'bg-primary/10 text-primary border-primary/20',    dot: 'bg-primary',     Icon: CheckCircle2 },
-  REJECTED:  { label: 'Rejected',  badge: 'bg-red-100 text-red-600 border-red-200',          dot: 'bg-red-500',     Icon: AlertTriangle },
-  OVERDUE:   { label: 'Overdue',   badge: 'bg-red-100 text-red-700 border-red-200',          dot: 'bg-red-600',     Icon: AlertTriangle },
+  DRAFT:     { label: 'Draft',     badge: 'bg-gray-100 text-gray-600 border-gray-200',          dot: 'bg-gray-400',    Icon: FileEdit },
+  SUBMITTED: { label: 'Submitted', badge: 'bg-blue-50 text-blue-700 border-blue-200',             dot: 'bg-blue-500',    Icon: CheckCircle2 },
+  APPROVED:  { label: 'Approved',  badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',    dot: 'bg-emerald-500', Icon: CheckCircle2 },
+  REJECTED:  { label: 'Rejected',  badge: 'bg-red-50 text-red-700 border-red-200',                dot: 'bg-red-500',     Icon: AlertTriangle },
+  OVERDUE:   { label: 'Overdue',   badge: 'bg-red-100 text-red-700 border-red-200',               dot: 'bg-red-600',     Icon: AlertTriangle },
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -105,27 +106,6 @@ function ProgressBar({ pct, effectiveStatus }) {
   )
 }
 
-function StatCard({ label, value, sub, Icon, iconClass, trend }) {
-  return (
-    <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconClass}`}>
-          <Icon size={15} />
-        </div>
-        {trend !== undefined && (
-          <span className={`text-[10px] font-semibold flex items-center gap-0.5 ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {trend >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-            {Math.abs(trend)}%
-          </span>
-        )}
-      </div>
-      <p className="text-xl font-heading font-bold text-foreground tabular-nums">{value}</p>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-[10px] text-muted-foreground/60 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
 // ─── featured "current week" card ─────────────────────────────────────────────
 
 function FeaturedCard({ ts, onOpen }) {
@@ -133,7 +113,7 @@ function FeaturedCard({ ts, onOpen }) {
   const pct            = Math.min(100, (hours / 40) * 100)
   const effectiveStatus = getEffectiveStatus(ts)
   const canEdit        = ts.status === 'DRAFT'
-  const weekLabel      = `${format(parseISO(ts.weekStartDate), 'MMM d')} – ${format(parseISO(ts.weekEndDate), 'MMM d, yyyy')}`
+  const weekLabel      = `${format(parseISO(ts.weekStartDate), 'MMM d')} - ${format(parseISO(ts.weekEndDate), 'MMM d, yyyy')}`
   const weekNum        = getWeek(parseISO(ts.weekStartDate), { weekStartsOn: 1 })
   const insight        = getInsight(ts, hours, effectiveStatus)
   const remaining      = Math.max(0, 40 - hours)
@@ -153,7 +133,7 @@ function FeaturedCard({ ts, onOpen }) {
               </span>
               <span className="text-[10px] text-muted-foreground font-medium">Week {weekNum}</span>
             </div>
-            <p className="font-heading font-semibold text-foreground">{weekLabel}</p>
+            <p className="font-semibold text-foreground">{weekLabel}</p>
           </div>
           <StatusBadge status={effectiveStatus} />
         </div>
@@ -162,12 +142,12 @@ function FeaturedCard({ ts, onOpen }) {
         <div className="flex items-end gap-8 mb-5">
           <div>
             <p className="text-[11px] text-muted-foreground mb-1">Hours logged</p>
-            <p className="text-4xl font-heading font-bold text-foreground tabular-nums leading-none">{hours.toFixed(1)}</p>
+            <p className="text-4xl font-bold text-foreground tabular-nums leading-none">{hours.toFixed(1)}</p>
             <p className="text-sm text-muted-foreground mt-1">/ 40h target</p>
           </div>
           <div className="pb-1">
             <p className="text-[11px] text-muted-foreground mb-1">Remaining</p>
-            <p className="text-2xl font-heading font-semibold text-muted-foreground tabular-nums">{remaining.toFixed(1)}h</p>
+            <p className="text-2xl font-semibold text-muted-foreground tabular-nums">{remaining.toFixed(1)}h</p>
           </div>
         </div>
 
@@ -216,7 +196,7 @@ function WeekCard({ ts, onOpen }) {
   const pct             = Math.min(100, (hours / 40) * 100)
   const effectiveStatus = getEffectiveStatus(ts)
   const canEdit         = ts.status === 'DRAFT'
-  const weekLabel       = `${format(parseISO(ts.weekStartDate), 'MMM d')} – ${format(parseISO(ts.weekEndDate), 'MMM d')}`
+  const weekLabel       = `${format(parseISO(ts.weekStartDate), 'MMM d')} - ${format(parseISO(ts.weekEndDate), 'MMM d')}`
   const weekNum         = getWeek(parseISO(ts.weekStartDate), { weekStartsOn: 1 })
   const insight         = getInsight(ts, hours, effectiveStatus)
 
@@ -229,14 +209,14 @@ function WeekCard({ ts, onOpen }) {
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Week {weekNum}</p>
-          <p className="text-sm font-heading font-semibold text-foreground truncate">{weekLabel}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{weekLabel}</p>
         </div>
         <StatusBadge status={effectiveStatus} />
       </div>
 
       {/* hours */}
       <div className="flex items-baseline gap-1 mb-3">
-        <span className="text-2xl font-heading font-bold text-foreground tabular-nums">{hours.toFixed(1)}</span>
+        <span className="text-2xl font-bold text-foreground tabular-nums">{hours.toFixed(1)}</span>
         <span className="text-xs text-muted-foreground">/ 40h</span>
       </div>
 
@@ -275,6 +255,7 @@ export default function Timesheets() {
   const [statusFilter, setStatusFilter] = useState('ALL')
 
   useEffect(() => { dispatch(fetchMyTimesheets()) }, [dispatch])
+  useEffect(() => { dispatch(markSectionRead('TIMESHEET')) }, [dispatch])
 
   const handleOpen = (id) => navigate(`/timesheets/${id}`)
 
@@ -316,8 +297,8 @@ export default function Timesheets() {
       {/* page header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">My Timesheets</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track and manage your weekly time entries</p>
+          <h1 className="text-page-title">My Timesheets</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track and manage your weekly time entries</p>
         </div>
         <button
           className="btn-primary flex-shrink-0 flex items-center gap-2"
@@ -332,26 +313,10 @@ export default function Timesheets() {
       {/* stat strip */}
       {timesheets.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <StatCard
-            label="Total weeks" value={timesheets.length} sub="all time"
-            Icon={Calendar} iconClass="bg-blue-50 text-blue-600"
-          />
-          <StatCard
-            label="Hours logged" value={`${totalHours.toFixed(0)}h`} sub="across all weeks"
-            Icon={Clock} iconClass="bg-primary/8 text-primary" trend={12}
-          />
-          <StatCard
-            label="Submitted" value={submitted}
-            sub={`${timesheets.length > 0 ? Math.round((submitted / timesheets.length) * 100) : 0}% rate`}
-            Icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-600"
-          />
-          <StatCard
-            label="Avg / week" value={`${avgHours.toFixed(1)}h`}
-            sub={drafts > 0 ? `${drafts} draft${drafts > 1 ? 's' : ''} pending` : 'all submitted'}
-            Icon={TrendingUp}
-            iconClass={overdueCount > 0 ? 'bg-red-50 text-red-500' : 'bg-purple-50 text-purple-600'}
-            trend={overdueCount > 0 ? -(overdueCount * 5) : 8}
-          />
+          <StatCard title="Total Weeks"  value={timesheets.length}           icon={<Calendar size={16} />}     color="blue"   subtitle="all time" />
+          <StatCard title="Hours Logged" value={`${totalHours.toFixed(0)}h`}  icon={<Clock size={16} />}        color="blue"   subtitle="across all weeks" />
+          <StatCard title="Submitted"    value={submitted}                    icon={<CheckCircle2 size={16} />} color="green"  subtitle={`${timesheets.length > 0 ? Math.round((submitted / timesheets.length) * 100) : 0}% rate`} />
+          <StatCard title="Avg / Week"   value={`${avgHours.toFixed(1)}h`}    icon={<Clock size={16} />}        color={overdueCount > 0 ? 'red' : 'violet'} subtitle={overdueCount > 0 ? `${overdueCount} overdue` : drafts > 0 ? `${drafts} draft${drafts > 1 ? 's' : ''} pending` : 'all up to date'} />
         </div>
       )}
 
@@ -380,7 +345,7 @@ export default function Timesheets() {
               <div className="flex items-center gap-3">
                 <AlertTriangle size={18} className="text-amber-500 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-heading font-semibold text-amber-800">No timesheet for this week</p>
+                  <p className="text-sm font-semibold text-amber-800">No timesheet for this week</p>
                   <p className="text-xs text-amber-600 mt-0.5">Start logging today to stay on track</p>
                 </div>
               </div>

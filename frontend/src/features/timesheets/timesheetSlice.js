@@ -48,9 +48,8 @@ export const submitTimesheet = createAsyncThunk('timesheets/submit', async (id, 
 
 export const addEntry = createAsyncThunk('timesheets/addEntry', async ({ timesheetId, data }, { rejectWithValue }) => {
   try {
-    await timesheetService.addEntry(timesheetId, data)
-    // Refetch the full timesheet
-    const response = await timesheetService.getById(timesheetId)
+    // Backend returns the full updated TimesheetResponse — no second GET needed
+    const response = await timesheetService.addEntry(timesheetId, data)
     return response.data.data
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to add entry')
@@ -59,8 +58,7 @@ export const addEntry = createAsyncThunk('timesheets/addEntry', async ({ timeshe
 
 export const updateEntry = createAsyncThunk('timesheets/updateEntry', async ({ timesheetId, entryId, data }, { rejectWithValue }) => {
   try {
-    await timesheetService.updateEntry(entryId, data)
-    const response = await timesheetService.getById(timesheetId)
+    const response = await timesheetService.updateEntry(entryId, data)
     return response.data.data
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to update entry')
@@ -69,11 +67,28 @@ export const updateEntry = createAsyncThunk('timesheets/updateEntry', async ({ t
 
 export const deleteEntry = createAsyncThunk('timesheets/deleteEntry', async ({ timesheetId, entryId }, { rejectWithValue }) => {
   try {
-    await timesheetService.deleteEntry(entryId)
-    const response = await timesheetService.getById(timesheetId)
+    const response = await timesheetService.deleteEntry(entryId)
     return response.data.data
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to delete entry')
+  }
+})
+
+export const approveTimesheet = createAsyncThunk('timesheets/approve', async (id, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.approve(id)
+    return response.data.data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to approve timesheet')
+  }
+})
+
+export const rejectTimesheet = createAsyncThunk('timesheets/reject', async ({ id, reason }, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.reject(id, reason)
+    return response.data.data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to reject timesheet')
   }
 })
 
@@ -132,8 +147,38 @@ const timesheetSlice = createSlice({
       .addCase(submitTimesheet.fulfilled, (state, action) => {
         state.currentTimesheet = action.payload
         state.myTimesheets = state.myTimesheets.map(ts =>
-          ts.id === action.payload.id ? { ...ts, status: 'SUBMITTED' } : ts
+          ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
         )
+      })
+      .addCase(approveTimesheet.pending, (state) => { state.loading = true })
+      .addCase(approveTimesheet.fulfilled, (state, action) => {
+        state.loading = false
+        state.currentTimesheet = action.payload
+        state.myTimesheets = state.myTimesheets.map(ts =>
+          ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
+        )
+        state.allTimesheets = state.allTimesheets.map(ts =>
+          ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
+        )
+      })
+      .addCase(approveTimesheet.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
+      })
+      .addCase(rejectTimesheet.pending, (state) => { state.loading = true })
+      .addCase(rejectTimesheet.fulfilled, (state, action) => {
+        state.loading = false
+        state.currentTimesheet = action.payload
+        state.myTimesheets = state.myTimesheets.map(ts =>
+          ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
+        )
+        state.allTimesheets = state.allTimesheets.map(ts =>
+          ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
+        )
+      })
+      .addCase(rejectTimesheet.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
       })
       .addCase(addEntry.pending, (state) => { state.entriesLoading = true })
       .addCase(addEntry.fulfilled, (state, action) => {

@@ -30,11 +30,11 @@ export default function Profile() {
     }
     setSaving(true)
     try {
-      await dispatch(changePassword({
+      const message = await dispatch(changePassword({
         currentPassword: pwForm.currentPassword,
         newPassword: pwForm.newPassword,
       })).unwrap()
-      toast.success('Password changed successfully')
+      toast.success(message || 'Password changed successfully')
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err) {
       toast.error(err || 'Failed to change password')
@@ -67,12 +67,12 @@ export default function Profile() {
           <div className="relative flex items-center gap-5">
             <div className="relative flex-shrink-0">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg">
-                <span className="text-2xl font-heading font-bold text-white tracking-tight">{initials}</span>
+                <span className="text-2xl font-bold text-white tracking-tight">{initials}</span>
               </div>
               <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-card" title="Online" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-heading font-bold text-foreground truncate">{user?.name}</h2>
+              <h2 className="text-xl font-bold text-foreground truncate">{user?.name}</h2>
               <p className="text-sm text-muted-foreground mt-0.5 truncate">{user?.email}</p>
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                 <span className={`inline-flex items-center text-xs font-semibold border px-2.5 py-0.5 rounded-full ${roleBadgeColor}`}>
@@ -100,7 +100,7 @@ export default function Profile() {
               <User size={15} className="text-blue-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground">Personal Information</h3>
+              <h3 className="text-sm font-semibold text-foreground">Personal Information</h3>
               <p className="text-xs text-muted-foreground">Your account details</p>
             </div>
             <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ${open.personal ? 'rotate-180' : ''}`} />
@@ -136,7 +136,7 @@ export default function Profile() {
               <Shield size={15} className="text-purple-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground">Role &amp; Access</h3>
+              <h3 className="text-sm font-semibold text-foreground">Role &amp; Access</h3>
               <p className="text-xs text-muted-foreground">Your permissions and organisational details</p>
             </div>
             <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ${open.role ? 'rotate-180' : ''}`} />
@@ -152,7 +152,7 @@ export default function Profile() {
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Department</p>
               <div className="flex items-center gap-1.5">
                 <Building2 size={14} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm font-heading font-semibold text-foreground">{user?.departmentName || 'Not assigned'}</span>
+                <span className="text-sm font-semibold text-foreground">{user?.departmentName || 'Not assigned'}</span>
               </div>
             </div>
             <div className="bg-muted/50 rounded-lg p-4 border border-border">
@@ -176,7 +176,7 @@ export default function Profile() {
               <Lock size={15} className="text-amber-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground">Security</h3>
+              <h3 className="text-sm font-semibold text-foreground">Security</h3>
               <p className="text-xs text-muted-foreground">Update your password</p>
             </div>
             <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ${open.security ? 'rotate-180' : ''}`} />
@@ -184,9 +184,10 @@ export default function Profile() {
           {open.security && <form onSubmit={handlePasswordChange} className="space-y-4 max-w-sm mt-5">
             {passwordFields.map(({ field, label, key }) => (
               <div key={field}>
-                <label className="label">{label}</label>
+                <label htmlFor={`pw-${field}`} className="label">{label}</label>
                 <div className="relative">
                   <input
+                    id={`pw-${field}`}
                     type={showPasswords[field] ? 'text' : 'password'}
                     className="input pr-10"
                     value={pwForm[key]}

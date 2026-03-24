@@ -8,6 +8,8 @@ import com.timekeeper.entity.Employee;
 import com.timekeeper.service.EmployeeService;
 import com.timekeeper.service.TimesheetService;
 import com.timekeeper.dto.response.TimesheetResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Employees", description = "Employee management (Admin) and profile access")
 @RestController
 @RequestMapping("/api/v1/employees")
 @RequiredArgsConstructor
@@ -71,8 +74,16 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<EmployeeResponse>> updateStatus(
             @PathVariable String employeeId,
             @RequestBody Map<String, String> body) {
-        Employee.EmployeeStatus status = Employee.EmployeeStatus.valueOf(body.get("status").toUpperCase());
-        return ResponseEntity.ok(ApiResponse.success(employeeService.updateStatus(employeeId, status)));
+        String statusVal = body.get("status");
+        if (statusVal == null || statusVal.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("'status' field is required (ACTIVE or INACTIVE)"));
+        }
+        try {
+            Employee.EmployeeStatus status = Employee.EmployeeStatus.valueOf(statusVal.toUpperCase());
+            return ResponseEntity.ok(ApiResponse.success(employeeService.updateStatus(employeeId, status)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid status value: " + statusVal + ". Must be ACTIVE or INACTIVE"));
+        }
     }
 
     // Manager: get team

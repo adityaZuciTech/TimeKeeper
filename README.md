@@ -282,3 +282,38 @@ Full production-grade documentation is in [`project-specifications/`](project-sp
 | [reports-and-analytics.md](project-specifications/reports-and-analytics.md) | Organization dashboard and report types |
 | [export-and-reporting.md](project-specifications/export-and-reporting.md) | CSV and PDF export pipeline |
 | [notifications.md](project-specifications/notifications.md) | Email reminders and notification system |
+
+---
+
+## Testing
+
+### Backend Tests
+```bash
+cd backend
+mvn test
+```
+- **24 tests** across unit (JUnit 5 + Mockito) and integration (`@SpringBootTest` + MockMvc)
+- Covers: `AuthService`, `TimesheetService`, `LeaveService`, `AuthController` integration
+
+### Frontend E2E Tests (Playwright)
+```bash
+cd frontend
+npx playwright test
+```
+- **53 E2E tests** across authentication, timesheets, employees, leaves, reports, general navigation
+- Requires both backend and frontend servers to be running
+
+---
+
+## Code Review & Audit
+
+Full audit artifacts are in [`code-review/`](code-review/):
+
+| Document | Description |
+|---|---|
+| [FINAL_AUDIT_REPORT.md](code-review/FINAL_AUDIT_REPORT.md) | System quality summary, issues found, fixes, readiness rating |
+| [CODE_REVIEW.md](code-review/CODE_REVIEW.md) | Detailed security, performance, architecture findings |
+| [TEST_CASES.md](code-review/TEST_CASES.md) | Complete test scenario inventory (positive, negative, edge, security) |
+| [IMPROVEMENT_LOG.md](code-review/IMPROVEMENT_LOG.md) | Session-by-session history of all improvements made |
+
+**Audit Result: 9.0 / 10 — Production-Ready (Demo Scope)**

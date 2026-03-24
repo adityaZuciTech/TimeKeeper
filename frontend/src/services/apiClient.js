@@ -14,11 +14,14 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 globally
+// Handle 401 globally — but NOT for the login endpoint itself.
+// A 401 on /auth/login means wrong credentials; the Login component handles that inline.
+// A 401 on any other endpoint means the session expired; redirect to login.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url?.includes('/auth/login')
+    if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('tk_token')
       localStorage.removeItem('tk_user')
       window.location.href = '/login'

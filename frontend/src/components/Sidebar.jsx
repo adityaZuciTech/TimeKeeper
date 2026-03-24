@@ -1,12 +1,30 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { selectCurrentUser } from '../features/auth/authSlice'
+import { selectBadges } from '../features/notifications/notificationSlice'
 import {
   LayoutDashboard, Clock, Users, UserCheck, Building2,
   FolderKanban, BarChart2, User, Menu, X, ChevronRight, ChevronsLeft, ChevronsRight,
   CalendarOff, CalendarDays,
 } from 'lucide-react'
+
+// Maps nav paths to badge keys in the notifications badges object
+const BADGE_MAP = {
+  '/timesheets':   'timesheets',
+  '/team':         'team',
+  '/leaves/team':  'leaves',
+  '/leaves/my':    'leaves',
+}
+
+function BadgePill({ count }) {
+  if (!count || count === 0) return null
+  return (
+    <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1 leading-none flex-shrink-0">
+      {count > 9 ? '9+' : count}
+    </span>
+  )
+}
 
 // Each role's nav is split into labelled sections.
 // Set `collapsible: true` on a section to make it toggleable (default expanded).
@@ -43,11 +61,17 @@ const navGroups = {
     {
       section: 'WORK',
       items: [
-        { path: '/timesheets',  label: 'Timesheets',  Icon: Clock },
-        { path: '/team',        label: 'My Team',     Icon: UserCheck },
-        { path: '/leaves/my',   label: 'My Leaves',   Icon: CalendarOff },
-        { path: '/leaves/team', label: 'Team Leaves', Icon: Users },
-        { path: '/holidays',    label: 'Holidays',    Icon: CalendarDays },
+        { path: '/timesheets', label: 'Timesheets', Icon: Clock },
+        { path: '/leaves/my',  label: 'My Leaves',  Icon: CalendarOff },
+        { path: '/holidays',   label: 'Holidays',   Icon: CalendarDays },
+      ],
+    },
+    {
+      section: 'TEAM MANAGEMENT',
+      collapsible: true,
+      items: [
+        { path: '/team',        label: 'Team Overview', Icon: UserCheck },
+        { path: '/leaves/team', label: 'Team Leaves',   Icon: Users },
       ],
     },
     {
@@ -105,6 +129,7 @@ const navGroups = {
 function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
   // Track which collapsible sections are toggled shut (default: all expanded)
   const [closedSections, setClosedSections] = useState({})
+  const badges = useSelector(selectBadges)
 
   const toggleSection = (section) =>
     setClosedSections((prev) => ({ ...prev, [section]: !prev[section] }))
@@ -138,7 +163,7 @@ function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
               <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center flex-shrink-0 group-hover/logo:opacity-90 transition-opacity">
                 <Clock size={18} className="text-primary-foreground" />
               </div>
-              <span className="font-heading font-semibold text-white text-[15px] tracking-tight leading-tight truncate">
+              <span className="font-semibold text-white text-[15px] tracking-tight leading-tight truncate">
                 TimeKeeper
               </span>
             </NavLink>
@@ -158,9 +183,12 @@ function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
       {/* Nav */}
       <nav className="flex-1 py-4 px-2 sidebar-scroll overflow-y-auto">
         {collapsed ? (
-          /* ── Collapsed: flat icon-only list with tooltips ── */
+          /* -- Collapsed: flat icon-only list with tooltips -- */
           <div className="space-y-1">
-            {allItems.map(({ path, label, Icon }) => (
+            {allItems.map(({ path, label, Icon }) => {
+              const badgeKey = BADGE_MAP[path]
+              const badgeCount = badgeKey ? badges[badgeKey] : 0
+              return (
               <div key={path} className="relative group/nav">
                 <NavLink
                   to={path}
@@ -173,23 +201,37 @@ function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
                   }
                 >
                   {({ isActive }) => (
-                    <Icon size={18} className={`transition-colors ${
-                      isActive ? 'text-primary' : 'text-slate-400 group-hover/nav:text-white'
-                    }`} />
+                    <div className="relative">
+                      <Icon size={18} className={`transition-colors ${
+                        isActive ? 'text-primary' : 'text-slate-400 group-hover/nav:text-white'
+                      }`} />
+                      {badgeCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-bold px-0.5 leading-none">
+                          {badgeCount > 9 ? '9+' : badgeCount}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </NavLink>
-                {/* Tooltip — slide-in from left */}
+                {/* Tooltip - slide-in from left */}
                 <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-medium whitespace-nowrap shadow-lg z-50 opacity-0 -translate-x-1 group-hover/nav:opacity-100 group-hover/nav:translate-x-0 transition-all duration-150 ease-out">
                   {label}
                 </span>
               </div>
-            ))}
+            )
+          })}
           </div>
         ) : (
-          /* ── Expanded: sectioned groups ── */
+          /* -- Expanded: sectioned groups -- */
           <div className="space-y-5">
             {groups.map(({ section, items, collapsible }) => {
               const isClosed = closedSections[section]
+              const sectionBadgeCount = collapsible
+                ? items.reduce((sum, { path }) => {
+                    const key = BADGE_MAP[path]
+                    return sum + (key ? (badges[key] || 0) : 0)
+                  }, 0)
+                : 0
               return (
                 <div key={section}>
                   {/* Section header */}
@@ -202,28 +244,38 @@ function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
                       collapsible ? 'cursor-pointer group/sh select-none' : 'cursor-default'
                     }`}
                   >
-                    <span className="text-[10px] font-heading font-semibold uppercase tracking-widest text-slate-500 group-hover/sh:text-slate-300 transition-colors">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 group-hover/sh:text-slate-300 transition-colors">
                       {section}
                     </span>
                     {collapsible && (
-                      <ChevronRight
-                        size={11}
-                        className={`text-slate-500 group-hover/sh:text-slate-300 transition-all duration-200 ${
-                          isClosed ? '' : 'rotate-90'
-                        }`}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        {sectionBadgeCount > 0 && (
+                          <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary/80 text-primary-foreground text-[10px] font-bold px-1 leading-none">
+                            {sectionBadgeCount > 9 ? '9+' : sectionBadgeCount}
+                          </span>
+                        )}
+                        <ChevronRight
+                          size={11}
+                          className={`text-slate-500 group-hover/sh:text-slate-300 transition-all duration-200 ${
+                            isClosed ? '' : 'rotate-90'
+                          }`}
+                        />
+                      </div>
                     )}
                   </div>
 
                   {/* Items (hidden when section is collapsed) */}
                   {!isClosed && (
                     <div className="space-y-0.5">
-                      {items.map(({ path, label, Icon }) => (
+                      {items.map(({ path, label, Icon }) => {
+                        const badgeKey = BADGE_MAP[path]
+                        const badgeCount = badgeKey ? badges[badgeKey] : 0
+                        return (
                         <NavLink
                           key={path}
                           to={path}
                           className={({ isActive }) =>
-                            `w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-all duration-200 group border-l-2 ${
+                            `w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-200 group border-l-2 ${
                               isActive
                                 ? 'bg-slate-700 text-white font-medium border-primary'
                                 : 'text-slate-300 hover:bg-slate-700/60 hover:text-white border-transparent'
@@ -238,12 +290,14 @@ function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
                                   isActive ? 'text-primary' : 'text-slate-400 group-hover:text-white'
                                 }`}
                               />
-                              <span className="flex-1 font-body">{label}</span>
-                              {isActive && <ChevronRight size={12} className="text-primary opacity-60" />}
+                              <span className="flex-1">{label}</span>
+                              {badgeCount > 0 && <BadgePill count={badgeCount} />}
+                              {isActive && badgeCount === 0 && <ChevronRight size={12} className="text-primary opacity-60" />}
                             </>
                           )}
                         </NavLink>
-                      ))}
+                      )})
+                      }
                     </div>
                   )}
                 </div>
@@ -277,7 +331,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={`hidden lg:flex flex-col h-screen bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 flex-shrink-0 transition-all duration-300 ${collapsed ? 'w-16' : 'w-60'}`}>
+      <aside className={`hidden lg:flex flex-col h-screen bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 flex-shrink-0 transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-60'}`}>
         <SidebarContent
           user={user}
           groups={groups}
@@ -299,11 +353,11 @@ export default function Sidebar() {
           <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center">
             <Clock size={14} className="text-primary-foreground" />
           </div>
-          <span className="font-heading font-semibold text-white text-sm">TimeKeeper</span>
+          <span className="font-semibold text-white text-sm">TimeKeeper</span>
         </div>
       </div>
 
-      {/* Mobile overlay — icon-only compact sidebar */}
+      {/* Mobile overlay � icon-only compact sidebar */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />

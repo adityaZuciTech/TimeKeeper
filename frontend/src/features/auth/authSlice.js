@@ -1,9 +1,30 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { authService } from '../../services/authService'
 
-// Load persisted auth from localStorage
+// Decode JWT and check expiry without verifying signature (server validates on every request)
+function isTokenExpired(token) {
+  try {
+    // JWT payload is the second segment, base64url-encoded
+    const base64Payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64Payload))
+    if (!payload.exp) return true
+    // Add 10-second clock skew buffer
+    return payload.exp * 1000 < Date.now() - 10_000
+  } catch {
+    return true // malformed token → treat as expired
+  }
+}
+
+// Load persisted auth from localStorage — only trust token if it hasn't expired
 const storedToken = localStorage.getItem('tk_token')
 const storedUser = localStorage.getItem('tk_user')
+const tokenValid = !!storedToken && !isTokenExpired(storedToken)
+
+// Clean up stale data immediately so subsequent renders never see expired state
+if (!tokenValid) {
+  localStorage.removeItem('tk_token')
+  localStorage.removeItem('tk_user')
+}
 
 export const login = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
   try {
@@ -25,8 +46,8 @@ export const logoutAsync = createAsyncThunk('auth/logout', async (_, { getState 
 
 export const changePassword = createAsyncThunk('auth/changePassword', async (data, { rejectWithValue }) => {
   try {
-    await authService.changePassword(data)
-    return true
+    const response = await authService.changePassword(data)
+    return response.data?.message || 'Password changed successfully'
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to change password')
   }
@@ -35,8 +56,8 @@ export const changePassword = createAsyncThunk('auth/changePassword', async (dat
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
-    user: storedUser ? JSON.parse(storedUser) : null,
-    token: storedToken || null,
+    user: tokenValid && storedUser ? JSON.parse(storedUser) : null,
+    token: tokenValid ? storedToken : null,
     loading: false,
     error: null,
   },

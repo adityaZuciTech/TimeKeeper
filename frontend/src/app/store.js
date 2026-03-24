@@ -6,6 +6,7 @@ import timesheetReducer from '../features/timesheets/timesheetSlice'
 import departmentReducer from '../features/departments/departmentSlice'
 import leaveReducer from '../features/leaves/leaveSlice'
 import holidayReducer from '../features/holidays/holidaySlice'
+import notificationReducer from '../features/notifications/notificationSlice'
 
 export const store = configureStore({
   reducer: {
@@ -16,5 +17,6 @@ export const store = configureStore({
     departments: departmentReducer,
     leaves: leaveReducer,
     holidays: holidayReducer,
+    notifications: notificationReducer,
   },
 })

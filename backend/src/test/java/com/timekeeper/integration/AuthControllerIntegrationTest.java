@@ -94,4 +94,27 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
     }
+
+    // AUTH-07: inactive employee login returns 401
+    @Test
+    void login_inactiveEmployee_returns401() throws Exception {
+        Employee inactive = new Employee();
+        inactive.setId("int_emp_inactive");
+        inactive.setName("Inactive User");
+        inactive.setEmail("inactive@example.com");
+        inactive.setPassword(passwordEncoder.encode("password123"));
+        inactive.setRole(Employee.Role.EMPLOYEE);
+        inactive.setStatus(Employee.EmployeeStatus.INACTIVE);
+        employeeRepository.save(inactive);
+
+        LoginRequest req = new LoginRequest();
+        req.setEmail("inactive@example.com");
+        req.setPassword("password123");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
 }

@@ -17,6 +17,10 @@ public class TimesheetResponse {
     private LocalDate weekEndDate;
     private BigDecimal totalHours;
     private String status;
+    /** Populated when status is APPROVED or REJECTED */
+    private String approvedBy;
+    private String approvedByName;
+    private String rejectionReason;
     private List<DayResponse> days;
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

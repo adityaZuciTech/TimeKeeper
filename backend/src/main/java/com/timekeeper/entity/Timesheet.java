@@ -33,6 +33,13 @@ public class Timesheet {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    /** Set when a manager/admin approves or rejects the timesheet */
+    @Column(name = "approved_by", length = 50)
+    private String approvedBy;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
     @OneToMany(mappedBy = "timesheet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TimeEntry> entries;
 
@@ -44,6 +51,6 @@ public class Timesheet {
     }
 
     public enum TimesheetStatus {
-        DRAFT, SUBMITTED
+        DRAFT, SUBMITTED, APPROVED, REJECTED
     }
 }

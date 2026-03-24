@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   fetchTimesheetById, submitTimesheet, addEntry, updateEntry, deleteEntry,
+  approveTimesheet, rejectTimesheet,
   selectCurrentTimesheet, selectTimesheetsLoading, selectEntriesLoading, selectTimesheetError, clearError
 } from '../../features/timesheets/timesheetSlice'
 import { fetchProjects, selectActiveProjects } from '../../features/projects/projectSlice'
@@ -106,7 +107,7 @@ function TimelineBar({ entries, colorMap }) {
               key={entry.entryId}
               className="absolute inset-y-0 opacity-75 hover:opacity-100 transition-opacity cursor-default"
               style={{ left: `${left}%`, width: `${w}%`, background: colorMap[entry.projectId] || '#6366F1' }}
-              title={`${entry.projectName}: ${entry.startTime?.substring(0,5)} – ${entry.endTime?.substring(0,5)}`}
+              title={`${entry.projectName}: ${entry.startTime?.substring(0,5)} - ${entry.endTime?.substring(0,5)}`}
             />
           )
         })}
@@ -134,7 +135,7 @@ function EntryRow({ entry, color, editable, onEdit, onDelete }) {
       <div className="flex items-baseline gap-2 min-w-0 overflow-hidden">
         <span className="text-sm font-medium text-foreground truncate">{entry.projectName}</span>
         <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap flex-shrink-0">
-          {entry.startTime?.substring(0,5)} – {entry.endTime?.substring(0,5)}
+          {entry.startTime?.substring(0,5)} - {entry.endTime?.substring(0,5)}
         </span>
         {entry.description && (
           <span className="text-[11px] text-muted-foreground/60 italic truncate hidden sm:block">
@@ -243,7 +244,7 @@ function EntryDrawer({
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <div>
-            <h2 className="text-base font-heading font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-foreground">
               {isEditing ? 'Edit Entry' : 'New Entry'}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -426,6 +427,10 @@ export default function TimesheetDetail() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null) // holds entryId to delete
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [confirmApprove, setConfirmApprove] = useState(false)
+  const [confirmReject,  setConfirmReject]  = useState(false)
+  const [rejectReason,   setRejectReason]   = useState('')
+  const [actionLoading,  setActionLoading]  = useState(false)
 
   useEffect(() => {
     dispatch(fetchTimesheetById(id))
@@ -452,8 +457,13 @@ export default function TimesheetDetail() {
 
   const isEditable = (day) => {
     const dayData = getDayData(day)
+    // Never allow editing future days regardless of backend editable flag
+    if (isFutureDay(timesheet?.weekStartDate, day)) return false
+    // Backend sets editable=false for locked timesheets (SUBMITTED / APPROVED)
     if (dayData && typeof dayData.editable === 'boolean') return dayData.editable
-    return !isSubmitted && !isFutureDay(timesheet?.weekStartDate, day)
+    // Fallback: not locked
+    const locked = timesheet?.status === 'SUBMITTED' || timesheet?.status === 'APPROVED'
+    return !locked
   }
 
   const openDrawer = (day, entry = null) => {
@@ -541,6 +551,41 @@ export default function TimesheetDetail() {
 
   if (loading || !timesheet) return <Layout><LoadingSpinner /></Layout>
 
+  // Locked = non-editable by the employee (submitted or approved)
+  const isLocked   = timesheet?.status === 'SUBMITTED' || timesheet?.status === 'APPROVED'
+  const canSubmit  = timesheet?.status === 'DRAFT'     || timesheet?.status === 'REJECTED'
+  const canApproveOrReject =
+    (currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') &&
+    timesheet?.status === 'SUBMITTED' &&
+    timesheet?.employeeId !== currentUser?.id
+
+  const doApprove = async () => {
+    setActionLoading(true)
+    try {
+      await dispatch(approveTimesheet(id)).unwrap()
+      toast.success('Timesheet approved!')
+      setConfirmApprove(false)
+    } catch (err) {
+      toast.error(err || 'Failed to approve timesheet')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const doReject = async () => {
+    setActionLoading(true)
+    try {
+      await dispatch(rejectTimesheet({ id, reason: rejectReason || undefined })).unwrap()
+      toast.success('Timesheet rejected')
+      setConfirmReject(false)
+      setRejectReason('')
+    } catch (err) {
+      toast.error(err || 'Failed to reject timesheet')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const totalHoursWeek = Number(timesheet.totalHours || 0)
   const weekPct   = Math.min(100, (totalHoursWeek / 40) * 100)
   const weekColor = weekPct >= 100 ? '#10B981' : weekPct >= 60 ? '#6366F1' : '#F59E0B'
@@ -562,17 +607,42 @@ export default function TimesheetDetail() {
 
       <div className="flex items-center justify-between gap-4 mb-2">
         <div className="flex items-center gap-3 flex-wrap min-w-0">
-          <h1 className="text-xl font-heading font-bold text-foreground">
-            {format(new Date(timesheet.weekStartDate), 'MMM d')} – {format(new Date(timesheet.weekEndDate), 'MMM d, yyyy')}
+          <h1 className="text-page-title">
+            {format(new Date(timesheet.weekStartDate), 'MMM d')} - {format(new Date(timesheet.weekEndDate), 'MMM d, yyyy')}
           </h1>
           <StatusBadge status={timesheet.status} />
         </div>
-        {!isSubmitted && (
+        {/* Submit button — visible when DRAFT or REJECTED */}
+        {canSubmit && (
           <button className="btn-primary flex-shrink-0 h-8 px-4 text-sm" onClick={handleSubmit}>
             Submit
           </button>
         )}
+        {/* Approve / Reject buttons — visible to MANAGER/ADMIN when SUBMITTED */}
+        {canApproveOrReject && (
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              className="btn-primary h-8 px-3 text-sm"
+              onClick={() => setConfirmApprove(true)}
+            >
+              Approve
+            </button>
+            <button
+              className="btn-danger h-8 px-3 text-sm"
+              onClick={() => { setRejectReason(''); setConfirmReject(true) }}
+            >
+              Reject
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Rejection reason banner */}
+      {timesheet.status === 'REJECTED' && timesheet.rejectionReason && (
+        <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+          <span className="font-semibold">Rejection reason:</span> {timesheet.rejectionReason}
+        </div>
+      )}
 
       {/* Week progress bar */}
       <div className="flex items-center gap-2 mb-6 max-w-sm">
@@ -677,7 +747,7 @@ export default function TimesheetDetail() {
                   ))}
                   {gaps.map((gap, i) => (
                     <div key={i} className="flex items-center gap-1.5 py-0.5 pl-1">
-                      <span className="text-[10px] text-amber-500">⚠ {gap.from}–{gap.to} gap ({(gap.minutes / 60).toFixed(1)}h)</span>
+                      <span className="text-[10px] text-amber-500">&#9888; {gap.from}-{gap.to} gap ({(gap.minutes / 60).toFixed(1)}h)</span>
                     </div>
                   ))}
                 </div>
@@ -742,6 +812,59 @@ export default function TimesheetDetail() {
         onConfirm={doDelete}
         onCancel={() => setConfirmDelete(null)}
       />
+
+      {/* ── Approve confirmation ─────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmApprove}
+        title="Approve this timesheet?"
+        description="The employee will be notified that their timesheet has been approved."
+        confirmLabel="Approve"
+        cancelLabel="Cancel"
+        variant="primary"
+        loading={actionLoading}
+        onConfirm={doApprove}
+        onCancel={() => setConfirmApprove(false)}
+      />
+
+      {/* ── Reject dialog with reason input ──────────────────────────── */}
+      {confirmReject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px]">
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-base font-semibold text-foreground">Reject this timesheet?</h3>
+            <p className="text-sm text-muted-foreground">
+              Provide a reason so the employee knows what to correct before resubmitting.
+            </p>
+            <div>
+              <textarea
+                className={`input text-sm w-full h-20 resize-none ${!rejectReason.trim() ? 'border-red-300 focus:ring-red-300' : ''}`}
+                placeholder="Reason for rejection (required)"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                autoFocus
+              />
+              {!rejectReason.trim() && (
+                <p className="text-xs text-red-500 mt-1">A rejection reason is required.</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="btn-secondary flex-1 h-9 text-sm"
+                onClick={() => setConfirmReject(false)}
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-danger flex-1 h-9 text-sm"
+                onClick={doReject}
+                disabled={actionLoading || !rejectReason.trim()}
+              >
+                {actionLoading ? 'Rejecting…' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   fetchProjects, createProject, updateProject, updateProjectStatus,
@@ -7,7 +7,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, StatCard } from '../../components/ui'
 import Modal from '../../components/Modal'
 import { reportService } from '../../services/reportService'
 import toast from 'react-hot-toast'
@@ -19,7 +19,7 @@ import {
   Edit3, RefreshCw,
 } from 'lucide-react'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// --- Constants ----------------------------------------------------------------
 const STATUS_META = {
   ACTIVE:    { label: 'Active',    cls: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-400' },
   COMPLETED: { label: 'Completed', cls: 'bg-primary/10 text-primary',       dot: 'bg-primary'     },
@@ -32,7 +32,7 @@ const DEPT_COLORS = [
   '#8B5CF6', '#EC4899', '#14B8A6', '#F97316',
 ]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 function fmtDate(d, fallback = '—') {
   if (!d) return fallback
   try { return format(new Date(d + 'T00:00:00'), 'MMM d, yyyy') } catch { return d }
@@ -64,7 +64,7 @@ function deptColor(name = '', depts = []) {
   return DEPT_COLORS[Math.abs(idx) % DEPT_COLORS.length]
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// --- Avatar -------------------------------------------------------------------
 const AVATAR_PALETTE = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 function Avatar({ name, size = 28, idx = 0 }) {
   const bg = AVATAR_PALETTE[idx % AVATAR_PALETTE.length]
@@ -102,7 +102,7 @@ function AvatarGroup({ contributors = [], max = 3 }) {
   )
 }
 
-// ─── StatusBadge ──────────────────────────────────────────────────────────────
+// --- StatusBadge --------------------------------------------------------------
 function ProjStatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.ON_HOLD
   return (
@@ -113,9 +113,9 @@ function ProjStatusBadge({ status }) {
   )
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// --- Progress bar -------------------------------------------------------------
 function TimelineBar({ pct, status }) {
-  if (pct === null) return <span className="text-xs text-muted-foreground">—</span>
+  if (pct === null) return <span className="text-xs text-muted-foreground">�</span>
   const color =
     status === 'DELAYED'   ? '#EF4444'
     : status === 'COMPLETED' ? '#6366F1'
@@ -134,7 +134,7 @@ function TimelineBar({ pct, status }) {
   )
 }
 
-// ─── Quick actions menu (3 dots) ─────────────────────────────────────────────
+// --- Quick actions menu (3 dots) ---------------------------------------------
 function RowMenu({ proj, onEdit, onStatusChange }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -181,7 +181,7 @@ function RowMenu({ proj, onEdit, onStatusChange }) {
   )
 }
 
-// ─── Project Drawer ───────────────────────────────────────────────────────────
+// --- Project Drawer -----------------------------------------------------------
 function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort }) {
   const [effort, setEffort]     = useState(null)
   const [loading, setLoading]   = useState(false)
@@ -222,7 +222,7 @@ function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort })
         <div className="flex items-start justify-between px-6 py-5 border-b border-border flex-shrink-0">
           <div className="flex-1 min-w-0 pr-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Project Details</p>
-            <h2 className="text-lg font-heading font-bold text-foreground leading-tight">{proj.name}</h2>
+            <h2 className="text-lg font-bold text-foreground leading-tight">{proj.name}</h2>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
             <X size={18} />
@@ -302,7 +302,7 @@ function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort })
                   Loading…
                 </div>
               ) : effort ? (
-                <p className="text-2xl font-heading font-bold text-foreground">{Number(effort.totalHoursLogged || 0).toFixed(0)}h</p>
+                <p className="text-2xl font-bold text-foreground">{Number(effort.totalHoursLogged || 0).toFixed(0)}h</p>
               ) : (
                 <p className="text-sm text-muted-foreground">No timesheet data available</p>
               )}
@@ -332,7 +332,7 @@ function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort })
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{c.employeeName}</p>
                       </div>
-                      <span className="text-sm font-heading font-bold tabular-nums text-foreground">
+                      <span className="text-sm font-bold tabular-nums text-foreground">
                         {Number(c.hoursLogged || 0).toFixed(0)}h
                       </span>
                     </div>
@@ -359,20 +359,9 @@ function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort })
   )
 }
 
-// ─── Summary stat card ────────────────────────────────────────────────────────
-function SummaryCard({ label, value, icon: Icon, iconCls, valueCls }) {
-  return (
-    <div className="bg-card rounded-2xl border border-border shadow-sm p-5 hover:shadow-md transition-shadow">
-      <div className={`inline-flex p-2 rounded-lg mb-3 ${iconCls}`}>
-        <Icon size={16} />
-      </div>
-      <p className="text-2xl font-heading font-bold text-foreground mb-0.5 tabular-nums">{value}</p>
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-    </div>
-  )
-}
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+
+// --- Main ---------------------------------------------------------------------
 export default function Projects() {
   const dispatch    = useDispatch()
   const projects    = useSelector(selectProjects)
@@ -399,7 +388,7 @@ export default function Projects() {
     dispatch(fetchDepartments())
   }, [dispatch])
 
-  // ── Derived lists ──────────────────────────────────────────────────────────
+  // -- Derived lists ----------------------------------------------------------
   const filtered = projects.filter(p => {
     const nameMatch = !search     || p.name.toLowerCase().includes(search.toLowerCase())
     const deptMatch = !deptFilter || p.departmentId === deptFilter || p.departmentName === deptFilter
@@ -415,7 +404,7 @@ export default function Projects() {
     delayed:   projects.filter(p => deriveStatus(p) === 'DELAYED').length,
   }
 
-  // ── CRUD handlers ──────────────────────────────────────────────────────────
+  // -- CRUD handlers ----------------------------------------------------------
   const openCreate = () => {
     setEditTarget(null)
     setForm({ name: '', clientName: '', departmentId: '', startDate: '', endDate: '' })
@@ -452,14 +441,14 @@ export default function Projects() {
     } catch (err) { toast.error(err || 'Failed') }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // -- Render -----------------------------------------------------------------
   return (
     <Layout>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground tracking-tight">Projects</h1>
+          <h1 className="text-page-title">Projects</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {projects.length} project{projects.length !== 1 ? 's' : ''} total
           </p>
@@ -473,10 +462,10 @@ export default function Projects() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Total"     value={stats.total}     icon={Briefcase}     iconCls="bg-primary/10 text-primary"       />
-        <SummaryCard label="Active"    value={stats.active}    icon={Zap}           iconCls="bg-emerald-100 text-emerald-600"  />
-        <SummaryCard label="Completed" value={stats.completed} icon={CheckCircle2}  iconCls="bg-primary/10 text-primary"       />
-        <SummaryCard label="On Hold"   value={stats.onHold}    icon={PauseCircle}   iconCls="bg-amber-100 text-amber-600"     />
+        <StatCard title="Total"     value={stats.total}     icon={<Briefcase size={16}    />} color="blue"   subtitle={`${stats.total} project${stats.total !== 1 ? 's' : ''}`} />
+        <StatCard title="Active"    value={stats.active}    icon={<Zap size={16}          />} color="green"  subtitle={stats.delayed > 0 ? `${stats.delayed} delayed` : 'All on schedule'} />
+        <StatCard title="Completed" value={stats.completed} icon={<CheckCircle2 size={16} />} color="violet" subtitle={stats.total ? `${Math.round((stats.completed / stats.total) * 100)}% done` : '—'} />
+        <StatCard title="On Hold"   value={stats.onHold}    icon={<PauseCircle size={16}  />} color="amber"  subtitle="Paused projects" />
       </div>
 
       {/* Search + Filters row */}
@@ -552,12 +541,12 @@ export default function Projects() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left px-5 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider">Project</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Client</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Department</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Timeline</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider w-40 hidden lg:table-cell">Progress</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="text-left px-5 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Project</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Client</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Department</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Timeline</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider w-40 hidden lg:table-cell">Progress</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3.5 w-10" />
                   </tr>
                 </thead>
@@ -584,7 +573,7 @@ export default function Projects() {
                               {(proj.name || 'P')[0].toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-heading font-semibold text-foreground text-sm leading-tight">{proj.name}</p>
+                              <p className="font-semibold text-foreground text-sm leading-tight">{proj.name}</p>
                               <p className="text-xs text-muted-foreground md:hidden">{proj.clientName || proj.departmentName || ''}</p>
                             </div>
                           </div>
@@ -612,7 +601,7 @@ export default function Projects() {
                           {proj.startDate ? (
                             <span>
                               {format(new Date(proj.startDate + 'T00:00:00'), 'MMM d')}
-                              <span className="mx-1.5">→</span>
+                              <span className="mx-1.5">–</span>
                               {proj.endDate ? format(new Date(proj.endDate + 'T00:00:00'), 'MMM d, yyyy') : '—'}
                             </span>
                           ) : '—'}

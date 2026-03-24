@@ -29,6 +29,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final EmployeeRepository employeeRepository;
 
+    /**
+     * Skip this filter for public auth endpoints and Swagger UI — they don't need JWT processing.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        // Only skip JWT processing for truly public endpoints.
+        // /change-password and any future authenticated auth routes must NOT be skipped.
+        return path.equals("/api/v1/auth/login")
+                || path.equals("/api/v1/auth/logout")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs");
+    }
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -37,23 +51,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
 
+        // No Bearer token present — pass through; Spring Security will return 401 if the
+        // endpoint requires authentication.
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        final String jwt = authHeader.substring(7);
 
         try {
-            userEmail = jwtService.extractUsername(jwt);
+            String userEmail = jwtService.extractUsername(jwt);
 
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = employeeRepository.findByEmail(userEmail).orElse(null);
                 if (userDetails == null) {
-                    filterChain.doFilter(request, response);
+                    log.warn("JWT references unknown user '{}' for {}", userEmail, request.getRequestURI());
+                    sendUnauthorized(response, "Authentication required");
                     return;
                 }
 
@@ -65,16 +80,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                } else {
+                    // Token signature is valid but it has been revoked (blacklisted)
+                    log.debug("Revoked token used by '{}' for {}", userEmail, request.getRequestURI());
+                    sendUnauthorized(response, "Token has been revoked. Please log in again.");
+                    return;
                 }
             }
         } catch (ExpiredJwtException e) {
-            log.debug("JWT token expired for request to {}", request.getRequestURI());
+            log.debug("Expired JWT for {}: {}", request.getRequestURI(), e.getMessage());
+            sendUnauthorized(response, "Session expired. Please log in again.");
+            return;
         } catch (MalformedJwtException | UnsupportedJwtException | SignatureException e) {
-            log.warn("Invalid JWT token for request to {}: {}", request.getRequestURI(), e.getMessage());
+            log.warn("Invalid JWT for {}: {}", request.getRequestURI(), e.getMessage());
+            sendUnauthorized(response, "Invalid token.");
+            return;
         } catch (Exception e) {
-            log.error("Unexpected error processing JWT for request to {}", request.getRequestURI(), e);
+            log.error("Unexpected error processing JWT for {}", request.getRequestURI(), e);
+            sendUnauthorized(response, "Authentication error.");
+            return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"success\":false,\"message\":\"" + message + "\"}");
     }
 }

@@ -4,6 +4,8 @@ import com.timekeeper.dto.request.CreateHolidayRequest;
 import com.timekeeper.dto.response.ApiResponse;
 import com.timekeeper.dto.response.HolidayResponse;
 import com.timekeeper.service.HolidayService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Holidays", description = "Company-wide holiday calendar")
 @RestController
 @RequestMapping("/api/v1/holidays")
 @RequiredArgsConstructor

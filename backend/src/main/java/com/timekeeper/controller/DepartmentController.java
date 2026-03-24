@@ -7,6 +7,8 @@ import com.timekeeper.dto.response.EmployeeResponse;
 import com.timekeeper.entity.Department;
 import com.timekeeper.service.DepartmentService;
 import com.timekeeper.service.EmployeeService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Departments", description = "Department CRUD and employee listing")
 @RestController
 @RequestMapping("/api/v1/departments")
 @RequiredArgsConstructor

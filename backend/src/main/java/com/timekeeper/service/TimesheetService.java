@@ -10,6 +10,7 @@ import com.timekeeper.exception.BusinessException;
 import com.timekeeper.exception.ResourceNotFoundException;
 import com.timekeeper.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TimesheetService {
 
@@ -41,6 +44,7 @@ public class TimesheetService {
     private final ProjectRepository projectRepository;
     private final LeaveRepository leaveRepository;
     private final HolidayRepository holidayRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public TimesheetResponse createOrGetForWeek(String employeeId, CreateTimesheetRequest request) {
@@ -73,23 +77,27 @@ public class TimesheetService {
         return toDetailResponse(timesheet);
     }
 
+    @Transactional(readOnly = true)
     public TimesheetResponse getById(String timesheetId) {
         Timesheet timesheet = timesheetRepository.findById(timesheetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
         return toDetailResponse(timesheet);
     }
 
+    @Transactional(readOnly = true)
     public List<TimesheetResponse> getMyTimesheets(String employeeId) {
         List<Timesheet> timesheets = timesheetRepository
                 .findTop5ByEmployeeIdOrderByWeekStartDateDesc(employeeId, PageRequest.of(0, 5));
         return timesheets.stream().map(this::toSummaryResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<TimesheetResponse> getAllTimesheets(String employeeId) {
         List<Timesheet> timesheets = timesheetRepository.findByEmployeeIdOrderByWeekStartDateDesc(employeeId);
         return timesheets.stream().map(this::toSummaryResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getAllTimesheetsPaged(String employeeId, int page, int size) {
         org.springframework.data.domain.Pageable pageable =
                 PageRequest.of(page, Math.min(size, 50), org.springframework.data.domain.Sort.by("weekStartDate").descending());
@@ -106,6 +114,7 @@ public class TimesheetService {
         );
     }
 
+    @Transactional(readOnly = true)
     public TimesheetResponse getByWeek(String employeeId, LocalDate weekStartDate) {
         LocalDate weekStart = normalizeToMonday(weekStartDate);
         return timesheetRepository.findByEmployeeIdAndWeekStartDate(employeeId, weekStart)
@@ -121,8 +130,9 @@ public class TimesheetService {
         if (!timesheet.getEmployee().getId().equals(employeeId)) {
             throw new AccessDeniedException("You can only submit your own timesheets");
         }
-        if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
-            throw new BusinessException("Timesheet is already submitted");
+        if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED ||
+                timesheet.getStatus() == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot re-submit a timesheet that is already submitted or approved");
         }
 
         // Prevent submitting a timesheet with no logged hours
@@ -135,23 +145,40 @@ public class TimesheetService {
 
         timesheet.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
         timesheet = timesheetRepository.save(timesheet);
+
+        String managerId = timesheet.getEmployee().getManagerId();
+        if (managerId != null) {
+            String weekLabel = timesheet.getWeekStartDate() + " to " + timesheet.getWeekEndDate();
+            notificationService.create(managerId,
+                    "Timesheet Submitted",
+                    timesheet.getEmployee().getName() + " submitted their timesheet for " + weekLabel,
+                    Notification.NotificationType.TIMESHEET_SUBMITTED,
+                    Notification.NotificationSection.TEAM);
+        }
+
         return toDetailResponse(timesheet);
     }
 
     @Transactional
-    public TimeEntryResponse addEntry(String timesheetId, String employeeId, AddTimeEntryRequest request) {
+    public TimesheetResponse addEntry(String timesheetId, String employeeId, AddTimeEntryRequest request) {
         Timesheet timesheet = timesheetRepository.findById(timesheetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
 
         if (!timesheet.getEmployee().getId().equals(employeeId)) {
             throw new AccessDeniedException("Access denied");
         }
-        if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
-            throw new BusinessException("Cannot modify a submitted timesheet");
+        if (timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED ||
+                timesheet.getStatus() == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot modify a submitted or approved timesheet");
+        }
+
+        // Block entries on future dates
+        LocalDate dayDate = timesheet.getWeekStartDate().plusDays(DAY_OFFSET.get(request.getDay()));
+        if (dayDate.isAfter(LocalDate.now())) {
+            throw new BusinessException("Cannot log time for a future date");
         }
 
         // Block entries on holidays or approved leave days
-        LocalDate dayDate = timesheet.getWeekStartDate().plusDays(DAY_OFFSET.get(request.getDay()));
         List<Holiday> holidaysOnDay = holidayRepository.findByDateBetween(dayDate, dayDate);
         if (!holidaysOnDay.isEmpty()) {
             throw new BusinessException("Cannot log time on a company holiday: " + holidaysOnDay.get(0).getName());
@@ -189,19 +216,20 @@ public class TimesheetService {
         }
 
         entry = timeEntryRepository.save(entry);
-        return toEntryResponse(entry);
+        return toDetailResponse(timesheet);
     }
 
     @Transactional
-    public TimeEntryResponse updateEntry(String entryId, String employeeId, UpdateTimeEntryRequest request) {
+    public TimesheetResponse updateEntry(String entryId, String employeeId, UpdateTimeEntryRequest request) {
         TimeEntry entry = timeEntryRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Time entry not found: " + entryId));
 
         if (!entry.getTimesheet().getEmployee().getId().equals(employeeId)) {
             throw new AccessDeniedException("Access denied");
         }
-        if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
-            throw new BusinessException("Cannot modify a submitted timesheet");
+        if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED ||
+                entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot modify a submitted or approved timesheet");
         }
         if (entry.getEntryType() != TimeEntry.EntryType.WORK) {
             throw new BusinessException("Can only update WORK entries via this endpoint");
@@ -244,25 +272,29 @@ public class TimesheetService {
         entry.setHoursLogged(newHours);
         if (request.getDescription() != null) entry.setDescription(request.getDescription());
 
-        entry = timeEntryRepository.save(entry);
-        return toEntryResponse(entry);
+        timeEntryRepository.save(entry);
+        return toDetailResponse(entry.getTimesheet());
     }
 
     @Transactional
-    public void deleteEntry(String entryId, String employeeId) {
+    public TimesheetResponse deleteEntry(String entryId, String employeeId) {
         TimeEntry entry = timeEntryRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Time entry not found: " + entryId));
 
         if (!entry.getTimesheet().getEmployee().getId().equals(employeeId)) {
             throw new AccessDeniedException("Access denied");
         }
-        if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED) {
-            throw new BusinessException("Cannot modify a submitted timesheet");
+        if (entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.SUBMITTED ||
+                entry.getTimesheet().getStatus() == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot modify a submitted or approved timesheet");
         }
 
+        Timesheet timesheet = entry.getTimesheet();
         timeEntryRepository.delete(entry);
+        return toDetailResponse(timesheet);
     }
 
+    @Transactional(readOnly = true)
     public List<TimeEntryResponse> getEntries(String timesheetId) {
         return timeEntryRepository.findByTimesheetId(timesheetId).stream()
                 .map(this::toEntryResponse)
@@ -328,7 +360,9 @@ public class TimesheetService {
     // Build the full detail response with days and entries, overlaying leave/holiday awareness
     public TimesheetResponse toDetailResponse(Timesheet timesheet) {
         List<TimeEntry> allEntries = timeEntryRepository.findByTimesheetId(timesheet.getId());
-        boolean isSubmitted = timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED;
+        // Timesheet is locked (non-editable) when SUBMITTED or APPROVED
+        boolean isLocked = timesheet.getStatus() == Timesheet.TimesheetStatus.SUBMITTED
+                || timesheet.getStatus() == Timesheet.TimesheetStatus.APPROVED;
 
         // Pre-fetch holidays and approved leaves for this week (Mon–Fri)
         LocalDate weekStart = timesheet.getWeekStartDate();
@@ -384,7 +418,7 @@ public class TimesheetService {
                 }
             }
 
-            boolean editable = !isSubmitted && dayStatus.equals("WORK");
+            boolean editable = !isLocked && dayStatus.equals("WORK") && !dayDate.isAfter(LocalDate.now());
 
             for (TimeEntry e : dayEntries) {
                 if (e.getHoursLogged() != null) dayHours = dayHours.add(e.getHoursLogged());
@@ -414,6 +448,9 @@ public class TimesheetService {
                 .weekEndDate(timesheet.getWeekEndDate())
                 .totalHours(totalHours)
                 .status(timesheet.getStatus().name())
+                .approvedBy(timesheet.getApprovedBy())
+                .approvedByName(resolveApproverName(timesheet.getApprovedBy()))
+                .rejectionReason(timesheet.getRejectionReason())
                 .days(days)
                 .build();
     }
@@ -428,7 +465,100 @@ public class TimesheetService {
                 .weekEndDate(timesheet.getWeekEndDate())
                 .totalHours(total != null ? total : BigDecimal.ZERO)
                 .status(timesheet.getStatus().name())
+                .approvedBy(timesheet.getApprovedBy())
+                .rejectionReason(timesheet.getRejectionReason())
                 .build();
+    }
+
+    /** Resolve approver's display name for detail responses. Returns null if no approver. */
+    private String resolveApproverName(String approverId) {
+        if (approverId == null) return null;
+        return employeeRepository.findById(approverId)
+                .map(Employee::getName)
+                .orElse(null);
+    }
+
+    /**
+     * Approve a SUBMITTED timesheet.
+     * MANAGER can only approve timesheets of their own direct reports.
+     */
+    @Transactional
+    public TimesheetResponse approveTimesheet(String timesheetId, String approverId,
+                                              Employee.Role approverRole) {
+        Timesheet timesheet = timesheetRepository.findById(timesheetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
+
+        if (timesheet.getStatus() != Timesheet.TimesheetStatus.SUBMITTED) {
+            throw new BusinessException("Only SUBMITTED timesheets can be approved");
+        }
+
+        if (approverId.equals(timesheet.getEmployee().getId())) {
+            throw new AccessDeniedException("You cannot approve your own timesheet");
+        }
+
+        if (approverRole == Employee.Role.MANAGER
+                && !approverId.equals(timesheet.getEmployee().getManagerId())) {
+            throw new AccessDeniedException(
+                    "Managers can only approve timesheets of their direct reports");
+        }
+
+        timesheet.setStatus(Timesheet.TimesheetStatus.APPROVED);
+        timesheet.setApprovedBy(approverId);
+        timesheet = timesheetRepository.save(timesheet);
+
+        String weekLabel = timesheet.getWeekStartDate() + " to " + timesheet.getWeekEndDate();
+        notificationService.create(timesheet.getEmployee().getId(),
+                "Timesheet Approved",
+                "Your timesheet for " + weekLabel + " has been approved.",
+                Notification.NotificationType.TIMESHEET_APPROVED,
+                Notification.NotificationSection.TIMESHEET);
+
+        return toDetailResponse(timesheet);
+    }
+
+    /**
+     * Reject a SUBMITTED timesheet.
+     * MANAGER can only reject timesheets of their own direct reports.
+     * Employee can then edit and re-submit (status goes back to editable mode).
+     */
+    @Transactional
+    public TimesheetResponse rejectTimesheet(String timesheetId, String approverId,
+                                             Employee.Role approverRole, String reason) {
+        Timesheet timesheet = timesheetRepository.findById(timesheetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
+
+        if (timesheet.getStatus() != Timesheet.TimesheetStatus.SUBMITTED) {
+            throw new BusinessException("Only SUBMITTED timesheets can be rejected");
+        }
+
+        if (approverId.equals(timesheet.getEmployee().getId())) {
+            throw new AccessDeniedException("You cannot reject your own timesheet");
+        }
+
+        if (approverRole == Employee.Role.MANAGER
+                && !approverId.equals(timesheet.getEmployee().getManagerId())) {
+            throw new AccessDeniedException(
+                    "Managers can only reject timesheets of their direct reports");
+        }
+
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("A rejection reason is required");
+        }
+
+        timesheet.setStatus(Timesheet.TimesheetStatus.REJECTED);
+        timesheet.setApprovedBy(approverId);
+        timesheet.setRejectionReason(reason);
+        timesheet = timesheetRepository.save(timesheet);
+
+        String weekLabel = timesheet.getWeekStartDate() + " to " + timesheet.getWeekEndDate();
+        String displayReason = (reason != null && !reason.isBlank()) ? reason : "No reason provided";
+        notificationService.create(timesheet.getEmployee().getId(),
+                "Timesheet Rejected",
+                "Your timesheet for " + weekLabel + " has been rejected. Reason: " + displayReason,
+                Notification.NotificationType.TIMESHEET_REJECTED,
+                Notification.NotificationSection.TIMESHEET);
+
+        return toDetailResponse(timesheet);
     }
 
     private TimeEntryResponse toEntryResponse(TimeEntry entry) {

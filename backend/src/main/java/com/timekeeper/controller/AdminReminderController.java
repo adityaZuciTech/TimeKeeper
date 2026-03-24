@@ -1,6 +1,8 @@
 package com.timekeeper.controller;
 
 import com.timekeeper.service.TimesheetReminderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import java.util.Map;
 /**
  * Admin-only controller for manually triggering reminder jobs (useful for testing).
  */
+@Tag(name = "Admin", description = "Admin-only operations such as manually triggering scheduled jobs")
 @RestController
 @RequestMapping("/api/v1/admin/reminders")
 @RequiredArgsConstructor
@@ -28,6 +31,8 @@ public class AdminReminderController {
      * Manually triggers the weekly timesheet reminder email job.
      * Restricted to ADMIN role only.
      */
+    @Operation(summary = "Trigger weekly timesheet reminders",
+               description = "Manually triggers the scheduled job that sends reminder emails to employees who have not submitted timesheets")
     @PostMapping("/timesheets")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> triggerWeeklyTimesheetReminder() {
