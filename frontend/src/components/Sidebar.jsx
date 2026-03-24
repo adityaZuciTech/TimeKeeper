@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { selectCurrentUser, logoutAsync } from '../features/auth/authSlice'
-import { selectBadges, selectUnreadCount } from '../features/notifications/notificationSlice'
+import { selectBadges } from '../features/notifications/notificationSlice'
+import NotificationBell from './NotificationBell'
 import {
   LayoutDashboard, Clock, Users, UserCheck, Building2,
   FolderKanban, BarChart2, User, Menu, X, ChevronRight, ChevronsLeft, ChevronsRight,
-  CalendarOff, CalendarDays, LogOut, Bell,
+  CalendarOff, CalendarDays, LogOut,
 } from 'lucide-react'
 
 // Maps nav paths to badge keys in the notifications badges object
@@ -317,7 +318,6 @@ export default function Sidebar() {
     try { return localStorage.getItem('sidebar-collapsed') === 'true' } catch { return false }
   })
   const user = useSelector(selectCurrentUser)
-  const unreadCount = useSelector(selectUnreadCount)
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
@@ -367,22 +367,9 @@ export default function Sidebar() {
           <span className="font-semibold text-white text-sm">TimeKeeper</span>
         </div>
 
-        {/* Right side: notification badge + logout */}
+        {/* Right side: notifications + avatar + logout */}
         <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => navigate('/profile')}
-            className="relative p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-primary rounded-full flex items-center justify-center px-1">
-                <span className="text-[10px] font-bold text-primary-foreground leading-none">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              </span>
-            )}
-          </button>
+          <NotificationBell buttonClassName="relative p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 transition-colors" />
           <button
             onClick={() => navigate('/profile')}
             className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
