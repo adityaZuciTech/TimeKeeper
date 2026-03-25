@@ -208,7 +208,8 @@ export default function Team() {
     load()
   }, [dispatch, user.id])
 
-  useEffect(() => { dispatch(markSectionRead('TEAM')) }, [dispatch])
+  // '/team' badge is keyed to 'team_timesheets' (TEAM_TIMESHEET channel — manager receives timesheet submissions)
+  useEffect(() => { dispatch(markSectionRead('TEAM_TIMESHEET')) }, [dispatch])
 
   const getHours = (empId) => {
     const found = utilization.find(u => u.employeeId === empId)

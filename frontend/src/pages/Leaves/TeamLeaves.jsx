@@ -45,7 +45,8 @@ export default function TeamLeaves() {
   const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => { dispatch(fetchTeamLeaves()) }, [dispatch])
-  useEffect(() => { dispatch(markSectionRead('TEAM')) }, [dispatch])
+  // '/leaves/team' badge is keyed to 'team_leaves' (TEAM_LEAVE channel — manager receives leave requests)
+  useEffect(() => { dispatch(markSectionRead('TEAM_LEAVE')) }, [dispatch])
 
   const filtered = filter === 'ALL' ? leaves : leaves.filter(l => l.status === filter)
   const pendingCount = leaves.filter(l => l.status === 'PENDING').length

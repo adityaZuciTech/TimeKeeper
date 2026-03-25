@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { applyLeave, fetchMyLeaves, fetchTeamLeaves, selectMyLeaves, selectTeamLeaves, selectLeavesLoading } from '../../features/leaves/leaveSlice'
 import { markSectionRead } from '../../features/notifications/notificationSlice'
+import { selectCurrentUser } from '../../features/auth/authSlice'
 import { fetchHolidays, selectHolidays } from '../../features/holidays/holidaySlice'
 import Layout from '../../components/Layout'
 import { LoadingSpinner, StatCard } from '../../components/ui'
@@ -355,6 +356,7 @@ function LeaveDrawer({ open, onClose, onSave, saving, error, balances, teamLeave
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function MyLeaves() {
   const dispatch   = useDispatch()
+  const user       = useSelector(selectCurrentUser)
   const leaves     = useSelector(selectMyLeaves)
   const teamLeaves = useSelector(selectTeamLeaves)
   const holidays   = useSelector(selectHolidays)
@@ -366,10 +368,13 @@ export default function MyLeaves() {
 
   useEffect(() => {
     dispatch(fetchMyLeaves())
-    dispatch(fetchTeamLeaves())
+    // Only managers/admins can call the team leaves endpoint; employees get a 403.
+    if (user?.role && user.role !== 'EMPLOYEE') {
+      dispatch(fetchTeamLeaves())
+    }
     dispatch(fetchHolidays())
     dispatch(markSectionRead('LEAVE'))
-  }, [dispatch])
+  }, [dispatch, user?.role])
 
   // ── Leave balances ───────────────────────────────────────────────────
   const balances = useMemo(() => {
@@ -438,7 +443,7 @@ export default function MyLeaves() {
       </div>
 
       {/* ── Summary strip ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <StatCard title="Pending Requests" value={pending}         icon={<AlertCircle size={16} />} color="amber" subtitle={pending === 0 ? 'All resolved' : `${pending} awaiting approval`} />
         <StatCard title="Approved Leaves"  value={approved}        icon={<CheckCircle2 size={16} />} color="green" subtitle={approved === 0 ? 'None this year' : `${approved} approved`} />
         <StatCard title="Days Used"        value={`${totalUsed}d`} icon={<Clock size={16} />}        color="blue"  subtitle={`of ${balances.reduce((s, b) => s + b.total, 0)} total days`} />
@@ -465,31 +470,33 @@ export default function MyLeaves() {
                 const cfg  = BALANCE_CONFIG[leave.leaveType]
                 const scfg = STATUS_CONFIG[leave.status]
                 return (
-                  <div key={leave.id} className="flex items-start gap-4 px-5 py-4 hover:bg-muted/25 transition-colors">
-                    <div className="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" style={{ background: cfg?.color ?? '#CBD5E1' }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-foreground">
-                          {format(parseISO(leave.startDate), 'MMM d')}
-                          {leave.startDate !== leave.endDate
-                            ? ` \u2013 ${format(parseISO(leave.endDate), 'MMM d, yyyy')}`
-                            : `, ${format(parseISO(leave.startDate), 'yyyy')}`}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${cfg?.badge ?? ''}`}>
-                          {cfg?.icon && <cfg.icon size={10} />}
-                          {leave.leaveType.charAt(0) + leave.leaveType.slice(1).toLowerCase()}
-                        </span>
-                        <span className="text-xs text-muted-foreground tabular-nums">{leave.totalDays}d</span>
+                  <div key={leave.id} className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 px-5 py-4 hover:bg-muted/25 transition-colors">
+                    <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                      <div className="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full" style={{ background: cfg?.color ?? '#CBD5E1' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-foreground">
+                            {format(parseISO(leave.startDate), 'MMM d')}
+                            {leave.startDate !== leave.endDate
+                              ? ` \u2013 ${format(parseISO(leave.endDate), 'MMM d, yyyy')}`
+                              : `, ${format(parseISO(leave.startDate), 'yyyy')}`}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full ${cfg?.badge ?? ''}`}>
+                            {cfg?.icon && <cfg.icon size={10} />}
+                            {leave.leaveType.charAt(0) + leave.leaveType.slice(1).toLowerCase()}
+                          </span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{leave.totalDays}d</span>
+                        </div>
+                        {leave.reason && <p className="text-xs text-muted-foreground mt-1 break-words line-clamp-2">{leave.reason}</p>}
+                        {leave.status === 'REJECTED' && leave.rejectionReason && (
+                          <p className="text-xs text-red-500 mt-1 break-words">{leave.rejectionReason}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">
+                          Applied {format(parseISO(leave.createdAt), 'MMM d, yyyy')}
+                        </p>
                       </div>
-                      {leave.reason && <p className="text-xs text-muted-foreground mt-1 truncate">{leave.reason}</p>}
-                      {leave.status === 'REJECTED' && leave.rejectionReason && (
-                        <p className="text-xs text-red-500 mt-1">Reason: {leave.rejectionReason}</p>
-                      )}
-                      <p className="text-[10px] text-muted-foreground/60 mt-1">
-                        Applied {format(parseISO(leave.createdAt), 'MMM d, yyyy')}
-                      </p>
                     </div>
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-full flex-shrink-0 ${scfg?.cls ?? ''}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-full self-start sm:flex-shrink-0 sm:mt-0 ${scfg?.cls ?? ''}`}>
                       {scfg?.icon}{scfg?.label ?? leave.status}
                     </span>
                   </div>

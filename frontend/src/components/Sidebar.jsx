@@ -10,12 +10,13 @@ import {
   CalendarOff, CalendarDays, LogOut,
 } from 'lucide-react'
 
-// Maps nav paths to badge keys in the notifications badges object
+// Maps nav paths to badge keys in the notifications badges object.
+// Each path maps to exactly ONE isolated channel — no cross-module bleed.
 const BADGE_MAP = {
-  '/timesheets':   'timesheets',
-  '/team':         'team',
-  '/leaves/team':  'leaves',
-  '/leaves/my':    'leaves',
+  '/timesheets':   'timesheets',       // TIMESHEET channel — employee's own timesheet outcomes
+  '/team':         'team_timesheets',  // TEAM_TIMESHEET channel — manager receives submissions
+  '/leaves/my':    'personal_leaves',  // LEAVE channel — employee's own leave outcomes
+  '/leaves/team':  'team_leaves',      // TEAM_LEAVE channel — manager receives leave requests
 }
 
 function BadgePill({ count }) {
@@ -92,9 +93,16 @@ const navGroups = {
     {
       section: 'WORK',
       items: [
-        { path: '/timesheets',  label: 'Timesheets',  Icon: Clock },
-        { path: '/leaves/my',   label: 'My Leaves',   Icon: CalendarOff },
-        { path: '/leaves/team', label: 'Team Leaves', Icon: UserCheck },
+        { path: '/timesheets', label: 'Timesheets', Icon: Clock },
+        { path: '/leaves/my',  label: 'My Leaves',  Icon: CalendarOff },
+      ],
+    },
+    {
+      section: 'TEAM MANAGEMENT',
+      collapsible: true,
+      items: [
+        { path: '/team',        label: 'Team Overview', Icon: UserCheck },
+        { path: '/leaves/team', label: 'Team Leaves',   Icon: Users },
       ],
     },
     {
@@ -129,7 +137,7 @@ const navGroups = {
 
 function SidebarContent({ user, groups, collapsed = false, onToggleCollapse }) {
   // Track which collapsible sections are toggled shut (default: all expanded)
-  const [closedSections, setClosedSections] = useState({})
+  const [closedSections, setClosedSections] = useState({ })
   const badges = useSelector(selectBadges)
 
   const toggleSection = (section) =>

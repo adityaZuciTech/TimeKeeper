@@ -86,7 +86,7 @@ public class LeaveServiceImpl implements LeaveService {
                     "Leave Request",
                     employee.getName() + " has requested leave from " + leave.getStartDate() + " to " + leave.getEndDate(),
                     Notification.NotificationType.LEAVE_APPLIED,
-                    Notification.NotificationSection.LEAVE);
+                    Notification.NotificationSection.TEAM_LEAVE); // manager action — not employee's personal channel
         }
 
         return toResponse(leave);

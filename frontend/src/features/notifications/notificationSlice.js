@@ -56,9 +56,11 @@ export const markSectionRead = createAsyncThunk(
 
 function computeBadges(notifications) {
   return {
-    timesheets: notifications.filter((n) => !n.read && n.targetSection === 'TIMESHEET').length,
-    leaves: notifications.filter((n) => !n.read && n.targetSection === 'LEAVE').length,
-    team: notifications.filter((n) => !n.read && n.targetSection === 'TEAM').length,
+    timesheets:      notifications.filter((n) => !n.read && n.targetSection === 'TIMESHEET').length,
+    team_timesheets: notifications.filter((n) => !n.read && n.targetSection === 'TEAM_TIMESHEET').length,
+    personal_leaves: notifications.filter((n) => !n.read && n.targetSection === 'LEAVE').length,
+    team_leaves:     notifications.filter((n) => !n.read && n.targetSection === 'TEAM_LEAVE').length,
+    team:            notifications.filter((n) => !n.read && n.targetSection === 'TEAM').length,
   }
 }
 
@@ -67,7 +69,7 @@ const notificationSlice = createSlice({
   initialState: {
     notifications: [],
     unreadCount: 0,
-    badges: { timesheets: 0, leaves: 0, team: 0 },
+    badges: { timesheets: 0, team_timesheets: 0, personal_leaves: 0, team_leaves: 0, team: 0 },
     loading: false,
   },
   reducers: {},
@@ -97,7 +99,7 @@ const notificationSlice = createSlice({
       .addCase(markAllNotificationsRead.fulfilled, (state) => {
         state.notifications = state.notifications.map((n) => ({ ...n, read: true }))
         state.unreadCount = 0
-        state.badges = { timesheets: 0, leaves: 0, team: 0 }
+        state.badges = { timesheets: 0, team_timesheets: 0, personal_leaves: 0, team_leaves: 0, team: 0 }
       })
       .addCase(markSectionRead.fulfilled, (state, action) => {
         const section = action.payload

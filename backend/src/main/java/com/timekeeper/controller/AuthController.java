@@ -36,22 +36,28 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
 
-        String ip = resolveClientIp(httpRequest);
+        String ip  = resolveClientIp(httpRequest);
+        // Composite key: one user's failures cannot block another on the same NAT/VPN IP.
+        String key = request.getEmail() + ":" + ip;
 
-        if (loginRateLimiter.isRateLimited(ip)) {
+        if (loginRateLimiter.isRateLimited(key)) {
+            long retryAfter = loginRateLimiter.getRetryAfterSeconds(key);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(ApiResponse.error("Too many login attempts. Please try again later."));
+                    .header("Retry-After", String.valueOf(retryAfter))
+                    .body(ApiResponse.error("Too many login attempts. Please try again in " + retryAfter + " seconds."));
         }
 
         try {
             LoginResponse response = authService.login(request);
-            loginRateLimiter.clearAttempts(ip);
+            loginRateLimiter.clearAttempts(key);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (Exception e) {
-            boolean nowLimited = loginRateLimiter.recordFailedAttempt(ip);
+            boolean nowLimited = loginRateLimiter.recordFailedAttempt(key);
             if (nowLimited) {
+                long retryAfter = loginRateLimiter.getRetryAfterSeconds(key);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(ApiResponse.error("Too many login attempts. Please try again in 1 minute."));
+                        .header("Retry-After", String.valueOf(retryAfter))
+                        .body(ApiResponse.error("Too many login attempts. Please try again in " + retryAfter + " seconds."));
             }
             throw e; // re-throw so GlobalExceptionHandler handles it (BadCredentialsException → 401)
         }
@@ -77,11 +83,19 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
     }
 
+    /**
+     * Only trust X-Forwarded-For when the direct connection comes from a known
+     * local proxy (127.0.0.1 / ::1).  Blindly trusting it allows an attacker to
+     * send a spoofed header and bypass the rate limiter.
+     */
     private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if ("127.0.0.1".equals(remoteAddr) || "::1".equals(remoteAddr)) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
     }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { login, selectIsAuthenticated, selectAuthError, selectAuthLoading, clearError } from '../../features/auth/authSlice'
+import { login, selectIsAuthenticated, selectAuthError, selectAuthLoading, clearError, selectRetryAfter } from '../../features/auth/authSlice'
 import { Clock, Eye, EyeOff, BarChart2, Users, Timer, AlertCircle } from 'lucide-react'
 
 const features = [
@@ -21,12 +21,14 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [inlineError, setInlineError] = useState('')
+  const [countdown, setCountdown] = useState(0)
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const error = useSelector(selectAuthError)
   const loading = useSelector(selectAuthLoading)
+  const retryAfter = useSelector(selectRetryAfter)
 
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true })
@@ -40,8 +42,22 @@ export default function Login() {
     }
   }, [error, dispatch])
 
+  // Start/continue countdown when a 429 Retry-After is stored in state
+  useEffect(() => {
+    if (retryAfter > 0) {
+      setCountdown(retryAfter)
+    }
+  }, [retryAfter])
+
+  useEffect(() => {
+    if (countdown <= 0) return
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(id)
+  }, [countdown])
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (countdown > 0) return
     setInlineError('')
     dispatch(login({ email, password }))
   }
@@ -138,7 +154,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-primary w-full mt-1 active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn-primary w-full mt-1 active:scale-[0.98] transition-transform" disabled={loading || countdown > 0}>
                 {loading ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -147,7 +163,7 @@ export default function Login() {
                     </svg>
                     Signing in...
                   </>
-                ) : 'Sign in'}
+                ) : countdown > 0 ? `Try again in ${countdown}s` : 'Sign in'}
               </button>
 
               {/* Inline error — persists until user retries (heuristic #9) */}

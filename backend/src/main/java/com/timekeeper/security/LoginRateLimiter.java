@@ -6,9 +6,10 @@ import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Simple in-memory per-IP login rate limiter.
+ * In-memory login rate limiter.
+ * Keyed on a composite "email:ip" string so that one user's failures cannot
+ * block another user who shares the same NAT/VPN address.
  * Allows up to {@code MAX_ATTEMPTS} failed attempts within {@code WINDOW_MS}.
- * Uses a leaky-bucket approach: when the window expires, the counter resets.
  */
 @Component
 public class LoginRateLimiter {
@@ -21,12 +22,12 @@ public class LoginRateLimiter {
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
     /**
-     * Record a failed attempt for the given IP.
-     * Returns {@code true} if the IP is now rate-limited (should be rejected).
+     * Record a failed attempt for the given composite key.
+     * Returns {@code true} if the key is now rate-limited (request should be rejected).
      */
-    public boolean recordFailedAttempt(String ip) {
+    public boolean recordFailedAttempt(String key) {
         long now = Instant.now().toEpochMilli();
-        Bucket bucket = buckets.compute(ip, (k, existing) -> {
+        Bucket bucket = buckets.compute(key, (k, existing) -> {
             if (existing == null || now - existing.windowStart() > WINDOW_MS) {
                 return new Bucket(1, now);
             }
@@ -35,20 +36,30 @@ public class LoginRateLimiter {
         return bucket.count() > MAX_ATTEMPTS;
     }
 
-    /** Check if the IP is currently rate-limited without recording a new attempt. */
-    public boolean isRateLimited(String ip) {
+    /** Check whether the key is currently rate-limited without recording a new attempt. */
+    public boolean isRateLimited(String key) {
         long now = Instant.now().toEpochMilli();
-        Bucket bucket = buckets.get(ip);
+        Bucket bucket = buckets.get(key);
         if (bucket == null) return false;
         if (now - bucket.windowStart() > WINDOW_MS) {
-            buckets.remove(ip);
+            buckets.remove(key);
             return false;
         }
         return bucket.count() >= MAX_ATTEMPTS;
     }
 
-    /** Clear the rate-limit record for an IP (called on successful login). */
-    public void clearAttempts(String ip) {
-        buckets.remove(ip);
+    /** Returns the number of seconds remaining in the current rate-limit window (0 if not limited). */
+    public long getRetryAfterSeconds(String key) {
+        long now = Instant.now().toEpochMilli();
+        Bucket bucket = buckets.get(key);
+        if (bucket == null) return 0;
+        long elapsed = now - bucket.windowStart();
+        if (elapsed >= WINDOW_MS) return 0;
+        return (WINDOW_MS - elapsed + 999) / 1000; // ceiling in seconds
+    }
+
+    /** Clear the rate-limit record for a key (called on successful login). */
+    public void clearAttempts(String key) {
+        buckets.remove(key);
     }
 }

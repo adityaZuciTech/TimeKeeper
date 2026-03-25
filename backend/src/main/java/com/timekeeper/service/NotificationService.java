@@ -57,8 +57,12 @@ public class NotificationService {
         Map<String, Long> badges = Map.of(
                 "timesheets", notifications.stream()
                         .filter(n -> !n.isRead() && "TIMESHEET".equals(n.getTargetSection())).count(),
+                "team_timesheets", notifications.stream()
+                        .filter(n -> !n.isRead() && "TEAM_TIMESHEET".equals(n.getTargetSection())).count(),
                 "leaves", notifications.stream()
                         .filter(n -> !n.isRead() && "LEAVE".equals(n.getTargetSection())).count(),
+                "team_leaves", notifications.stream()
+                        .filter(n -> !n.isRead() && "TEAM_LEAVE".equals(n.getTargetSection())).count(),
                 "team", notifications.stream()
                         .filter(n -> !n.isRead() && "TEAM".equals(n.getTargetSection())).count()
         );

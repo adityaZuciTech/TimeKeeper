@@ -153,7 +153,7 @@ public class TimesheetService {
                     "Timesheet Submitted",
                     timesheet.getEmployee().getName() + " submitted their timesheet for " + weekLabel,
                     Notification.NotificationType.TIMESHEET_SUBMITTED,
-                    Notification.NotificationSection.TEAM);
+                    Notification.NotificationSection.TEAM_TIMESHEET); // team-scoped — badge appears on /team (Team Overview)
         }
 
         return toDetailResponse(timesheet);

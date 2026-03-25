@@ -31,7 +31,11 @@ export const login = createAsyncThunk('auth/login', async (credentials, { reject
     const response = await authService.login(credentials)
     return response.data.data
   } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Login failed')
+    if (err.response?.status === 429) {
+      const retryAfter = parseInt(err.response.headers?.['retry-after'] || '60', 10)
+      return rejectWithValue({ message: err.response.data?.message || 'Too many login attempts.', retryAfter })
+    }
+    return rejectWithValue({ message: err.response?.data?.message || 'Login failed' })
   }
 })
 
@@ -60,6 +64,7 @@ const authSlice = createSlice({
     token: tokenValid ? storedToken : null,
     loading: false,
     error: null,
+    retryAfter: 0,
   },
   reducers: {
     logout: (state) => {
@@ -77,6 +82,7 @@ const authSlice = createSlice({
       .addCase(login.pending, (state) => {
         state.loading = true
         state.error = null
+        state.retryAfter = 0
       })
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false
@@ -95,7 +101,8 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false
-        state.error = action.payload
+        state.error = action.payload?.message ?? action.payload ?? 'Login failed'
+        state.retryAfter = action.payload?.retryAfter ?? 0
       })
       .addCase(logoutAsync.fulfilled, (state) => {
         state.user = null
@@ -120,3 +127,4 @@ export const selectCurrentUser = (state) => state.auth.user
 export const selectIsAuthenticated = (state) => !!state.auth.token
 export const selectAuthLoading = (state) => state.auth.loading
 export const selectAuthError = (state) => state.auth.error
+export const selectRetryAfter = (state) => state.auth.retryAfter

@@ -35,7 +35,7 @@ public class Notification {
     @Builder.Default
     private boolean read = false;
 
-    @Column(name = "target_section", length = 20)
+    @Column(name = "target_section", length = 20, columnDefinition = "VARCHAR(20)")
     @Enumerated(EnumType.STRING)
     private NotificationSection targetSection;
 
@@ -58,8 +58,10 @@ public class Notification {
     }
 
     public enum NotificationSection {
-        TIMESHEET,
-        LEAVE,
-        TEAM
+        TIMESHEET,       // Personal timesheet outcomes (approved/rejected) — received by the employee
+        TEAM_TIMESHEET,  // Team timesheet submissions — received by the manager at /team
+        LEAVE,           // Personal leave outcomes (approved/rejected) — received by the employee
+        TEAM_LEAVE,      // Team leave requests — received by the manager at /leaves/team
+        TEAM             // Legacy; no new notifications are created with this value
     }
 }
