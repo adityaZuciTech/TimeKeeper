@@ -12,7 +12,7 @@ export function PageTransition({ children, className = '' }) {
 }
 
 // ---- StatusBadge ----------------------------------------------------------
-// Semantic color mapping � consistent across ALL pages:
+// Semantic color mapping — consistent across ALL pages:
 //   Draft    ? gray    | Submitted ? blue
 //   Approved ? green   | Rejected  ? red
 //   Pending  ? amber   | Overdue   ? red
@@ -35,7 +35,7 @@ export function StatusBadge({ status }) {
   const cfg = badgeConfig[status] || {
     cls: 'badge-inactive',
     Icon: Minus,
-    label: status?.replace(/_/g, ' ') || '�',
+    label: status?.replace(/_/g, ' ') || 'Unknown',
   }
   const { cls, Icon, label } = cfg
   return (
@@ -107,7 +107,7 @@ export function LoadingSpinner({ label = 'Loading...' }) {
 
 // ---- LoadingButton -------------------------------------------------------
 // Drop-in replacement for any <button> that needs a loading state.
-// Usage: <LoadingButton loading={saving} onClick={�}>Save</LoadingButton>
+// Usage: <LoadingButton loading={saving} onClick={handler}>Save</LoadingButton>
 export function LoadingButton({ loading = false, disabled = false, children, className = '', type = 'button', onClick, variant = 'primary', autoFocus }) {
   const base = variant === 'ghost' ? 'btn-ghost' : variant === 'danger' ? 'btn-danger' : 'btn-primary'
   return (

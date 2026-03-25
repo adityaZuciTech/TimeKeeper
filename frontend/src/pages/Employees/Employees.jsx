@@ -201,14 +201,14 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
                 <Building2 size={12} className="text-muted-foreground" />
                 <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Department</span>
               </div>
-              <p className="text-sm font-medium text-foreground">{emp.departmentName || '�'}</p>
+              <p className="text-sm font-medium text-foreground">{emp.departmentName || '—'}</p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <User size={12} className="text-muted-foreground" />
                 <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Reports To</span>
               </div>
-              <p className="text-sm font-medium text-foreground">{manager ? manager.name : '�'}</p>
+              <p className="text-sm font-medium text-foreground">{manager ? manager.name : '—'}</p>
             </div>
           </div>
 

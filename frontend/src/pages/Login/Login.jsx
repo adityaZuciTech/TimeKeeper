@@ -150,7 +150,7 @@ export default function Login() {
                 ) : 'Sign in'}
               </button>
 
-              {/* Inline error � persists until user retries (heuristic #9) */}
+              {/* Inline error — persists until user retries (heuristic #9) */}
               {inlineError && (
                 <div className="flex items-start gap-2.5 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg" role="alert">
                   <AlertCircle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />

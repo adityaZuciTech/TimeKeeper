@@ -115,7 +115,7 @@ function ProjStatusBadge({ status }) {
 
 // --- Progress bar -------------------------------------------------------------
 function TimelineBar({ pct, status }) {
-  if (pct === null) return <span className="text-xs text-muted-foreground">�</span>
+  if (pct === null) return <span className="text-xs text-muted-foreground">—</span>
   const color =
     status === 'DELAYED'   ? '#EF4444'
     : status === 'COMPLETED' ? '#6366F1'

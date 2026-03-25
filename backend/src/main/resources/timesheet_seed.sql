@@ -10,6 +10,10 @@
 
 USE timekeeper_db;
 
+-- Ensure this session uses utf8mb4 so that any multi-byte / emoji text
+-- is stored and retrieved correctly.
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 1. Insert 5 timesheets
 -- ──────────────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Single unified font â€” Inter â€” used everywhere
+        // Single unified font — Inter — used everywhere
         heading: ['Inter', 'system-ui', 'sans-serif'],
         body:    ['Inter', 'system-ui', 'sans-serif'],
         sans:    ['Inter', 'system-ui', 'sans-serif'],

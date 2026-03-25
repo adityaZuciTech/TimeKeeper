@@ -5,7 +5,6 @@ import com.timekeeper.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -59,13 +58,13 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(401);
-                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setContentType("application/json;charset=UTF-8");
                     response.setCharacterEncoding("UTF-8");
                     response.getWriter().write("{\"success\":false,\"message\":\"Authentication required. Please log in.\"}");
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setStatus(403);
-                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setContentType("application/json;charset=UTF-8");
                     response.setCharacterEncoding("UTF-8");
                     response.getWriter().write("{\"success\":false,\"message\":\"Access denied. Insufficient permissions.\"}");
                 })

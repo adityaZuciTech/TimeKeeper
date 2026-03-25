@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
 import { EmptyState, SkeletonRows } from '../../components/ui'
@@ -324,7 +324,7 @@ export default function Organization() {
       const totalDeptHours = deptWithColor.reduce((acc, d) => acc + Number(d.totalHours || 0), 0)
 
       const payload = {
-        weekLabel: `${selectedOption.weeksAgo === 0 ? 'Week of' : selectedOption.label + ' Â·'} ${format(weekMonday, 'MMMM d, yyyy')}`,
+        weekLabel: `${selectedOption.weeksAgo === 0 ? 'Week of' : selectedOption.label + ' ·'} ${format(weekMonday, 'MMMM d, yyyy')}`,
         trendChartImage: trendImg,
         pieChartImage: pieImg,
         stats: {
@@ -403,7 +403,7 @@ export default function Organization() {
             Organization Overview
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {selectedOption.weeksAgo === 0 ? 'Week of' : `${selectedOption.label} â€¢`}{' '}
+            {selectedOption.weeksAgo === 0 ? 'Week of' : `${selectedOption.label} •`}{' '}
             {format(weekMonday, 'MMMM d, yyyy')}
           </p>
         </div>
@@ -451,7 +451,7 @@ export default function Organization() {
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 disabled:opacity-50"
                 >
                   <Send size={14} className="text-primary" />
-                  {reminderSending ? 'Sendingâ€¦' : 'Send Reminders'}
+                  {reminderSending ? 'Sending…' : 'Send Reminders'}
                 </button>
                 <button
                   onClick={handleExportCSV}
@@ -467,7 +467,7 @@ export default function Organization() {
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-3 disabled:opacity-50"
                 >
                   <FileText size={14} className="text-primary" />
-                  {pdfExporting ? 'Generating PDFâ€¦' : 'Export PDF Report'}
+                  {pdfExporting ? 'Generating PDF…' : 'Export PDF Report'}
                 </button>
               </div>
             )}
@@ -479,21 +479,21 @@ export default function Organization() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCardPremium
           title="Departments"
-          value={loading ? 'â€”' : departments.length}
+          value={loading ? '—' : departments.length}
           subtitle="Active departments"
           icon={Building2}
           iconColor="bg-primary/10 text-primary"
         />
         <StatCardPremium
           title="Total Employees"
-          value={loading ? 'â€”' : totalEmployees}
+          value={loading ? '—' : totalEmployees}
           subtitle="Tracked this period"
           icon={Users}
           iconColor="bg-emerald-100 text-emerald-600"
         />
         <StatCardPremium
           title="Hours This Week"
-          value={loading ? 'â€”' : `${totalHours.toFixed(0)}h`}
+          value={loading ? '—' : `${totalHours.toFixed(0)}h`}
           trend={dateRange === 'this_week' ? hoursTrend : null}
           sparkData={sparkHours.length >= 2 ? sparkHours : null}
           icon={Clock}
@@ -501,7 +501,7 @@ export default function Organization() {
         />
         <StatCardPremium
           title="Avg Utilization"
-          value={loading ? 'â€”' : `${avgUtil.toFixed(0)}%`}
+          value={loading ? '—' : `${avgUtil.toFixed(0)}%`}
           subtitle={
             loading ? undefined
             : avgUtil >= 80 ? 'Excellent performance'

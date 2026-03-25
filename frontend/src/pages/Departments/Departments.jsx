@@ -341,14 +341,14 @@ function DeptDrawer({ dept, employees, utilMap, onClose, onEdit, onToggle }) {
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${utilPct}%`, background: barColor }} />
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
-              {utilPct >= 80 ? 'High utilization � team is at capacity' : utilPct >= 50 ? 'Moderate utilization' : 'Low utilization this week'}
+              {utilPct >= 80 ? 'High utilization — team is at capacity' : utilPct >= 50 ? 'Moderate utilization' : 'Low utilization this week'}
             </p>
           </div>
 
           {/* Employee list */}
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Team Members {displayEmps.length > 0 && `� ${displayEmps.length}`}
+              Team Members {displayEmps.length > 0 && `· ${displayEmps.length}`}
             </h3>
             {empsLoading ? (
               <div className="space-y-2 animate-pulse">
@@ -428,7 +428,7 @@ function InsightsPanel({ depts, employees, utilMap }) {
   if (largestDept?.count > 0)
     insights.push({ icon: Users, color: 'text-primary', text: `${largestDept.name} is the largest team with ${largestDept.count} members` })
   if (lowDept && lowDept.id !== topDept?.id && lowDept.pct < 30)
-    insights.push({ icon: TrendingUp, color: 'text-muted-foreground', text: `${lowDept.name} has low activity � only ${lowDept.pct}% utilized` })
+    insights.push({ icon: TrendingUp, color: 'text-muted-foreground', text: `${lowDept.name} has low activity — only ${lowDept.pct}% utilized` })
 
   if (!insights.length) return null
 
@@ -476,7 +476,7 @@ export default function Departments() {
         rows.forEach(r => { map[r.departmentId] = r.totalHours ?? 0 })
         setUtilMap(map)
       })
-      .catch(() => {/* silently fail � utilization is enhancement only */})
+      .catch(() => {/* silently fail – utilization is enhancement only */})
   }, [dispatch])
 
   // -- Filtering --------------------------------------------------------------
@@ -547,7 +547,7 @@ export default function Departments() {
           <div>
             <h1 className="text-page-title">Departments</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {departments.length} department{departments.length !== 1 ? 's' : ''} � {totalEmps} total employees
+              {departments.length} department{departments.length !== 1 ? 's' : ''} · {totalEmps} total employees
             </p>
           </div>
           <button className="btn-primary flex-shrink-0" onClick={openCreate}>
@@ -573,7 +573,7 @@ export default function Departments() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               className="input pl-9 h-9 text-sm w-full"
-              placeholder="Search departments�"
+              placeholder="Search departments…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -609,7 +609,7 @@ export default function Departments() {
             >
               <option value="ALL">All sizes</option>
               <option value="SMALL">Small (&lt;5)</option>
-              <option value="MEDIUM">Medium (5�15)</option>
+              <option value="MEDIUM">Medium (5–15)</option>
               <option value="LARGE">Large (&gt;15)</option>
             </select>
             <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
