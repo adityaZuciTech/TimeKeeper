@@ -24,12 +24,12 @@ export default function Modal({ isOpen, onClose, title, children }) {
       <div className="flex items-center justify-center min-h-screen px-4 py-6">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-foreground/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-foreground/50 backdrop-blur-sm animate-fade-in"
           onClick={onClose}
           aria-hidden="true"
         />
         {/* Panel */}
-        <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md z-10 overflow-hidden">
+        <div className="relative bg-card rounded-xl border border-border shadow-xl w-full max-w-md z-10 overflow-hidden animate-scale-in">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <h3 id={titleId} className="text-base font-semibold text-foreground">{title}</h3>
             <button

@@ -17,4 +17,13 @@ export const timesheetService = {
   getEntries: (timesheetId) => apiClient.get(`/timesheets/${timesheetId}/entries`),
   updateEntry: (entryId, data) => apiClient.put(`/timesheets/entries/${entryId}`, data),
   deleteEntry: (entryId) => apiClient.delete(`/timesheets/entries/${entryId}`),
+
+  // Copy previous week WORK entries into the current DRAFT timesheet (MERGE strategy)
+  copyLastWeek: (timesheetId) => apiClient.post(`/timesheets/${timesheetId}/copy-last-week`),
+
+  // Dry-run: returns what would be copied/skipped without persisting anything
+  previewCopyLastWeek: (timesheetId) => apiClient.post(`/timesheets/${timesheetId}/copy-last-week`, null, { params: { dryRun: true } }),
+
+  // Save (or clear) an overtime comment for a specific day
+  saveOvertimeComment: (timesheetId, data) => apiClient.patch(`/timesheets/${timesheetId}/overtime-comment`, data),
 }

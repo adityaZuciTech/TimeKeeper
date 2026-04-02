@@ -5,7 +5,7 @@ import { fetchMyTimesheets, selectMyTimesheets, selectTimesheetsLoading } from '
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import { selectBadges } from '../../features/notifications/notificationSlice'
 import Layout from '../../components/Layout'
-import { StatusBadge, StatCard, EmptyState, SkeletonRows } from '../../components/ui'
+import { StatusBadge, StatCard, EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import { format, parseISO, isSameWeek } from 'date-fns'
 import { FileText, CheckCircle2, Clock, Edit3, Plus, ArrowRight, Users, CalendarOff } from 'lucide-react'
 
@@ -52,6 +52,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      <PageTransition>
 
       {/* Hero */}
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -206,6 +207,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      </PageTransition>
     </Layout>
   )
 }

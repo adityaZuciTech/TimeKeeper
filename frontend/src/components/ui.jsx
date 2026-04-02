@@ -167,9 +167,9 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Confir
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
       {/* Panel */}
-      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10 animate-scale-in">
         <div className="flex items-start gap-4 mb-5">
           <div className={`p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-primary/10 text-primary'}`}>
             {variant === 'danger' ? <AlertTriangle size={20} /> : <AlertCircle size={20} />}

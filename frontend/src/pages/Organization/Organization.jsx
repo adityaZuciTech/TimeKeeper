@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { EmptyState, SkeletonRows } from '../../components/ui'
+import { EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import PaginationBar from '../../components/PaginationBar'
 import SortableHeader from '../../components/SortableHeader'
 import { format } from 'date-fns'
@@ -395,6 +395,7 @@ export default function Organization() {
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <Layout>
+      <PageTransition>
 
       {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex items-start justify-between mb-8">
@@ -721,6 +722,7 @@ export default function Organization() {
           </div>
         </>
       )}
+      </PageTransition>
     </Layout>
   )
 }

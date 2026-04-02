@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -155,7 +156,6 @@ class TimesheetServiceTest {
         when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
         when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
         when(projectRepository.findById("proj_001")).thenReturn(Optional.of(project));
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any())).thenReturn(null);
         when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of());
         when(timeEntryRepository.save(any(TimeEntry.class))).thenAnswer(inv -> {
             TimeEntry e = inv.getArgument(0);
@@ -195,7 +195,6 @@ class TimesheetServiceTest {
         when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
         when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
         when(projectRepository.findById("proj_001")).thenReturn(Optional.of(project));
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any())).thenReturn(null);
         when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of());
 
         AddTimeEntryRequest req = new AddTimeEntryRequest();
@@ -207,7 +206,7 @@ class TimesheetServiceTest {
 
         assertThatThrownBy(() -> timesheetService.addEntry("ts_001", "emp_001", req))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("completed project");
+                .hasMessageContaining("inactive project");
     }
 
     // ── TS-04: creating a timesheet for a past week is allowed ─────────────────
@@ -234,30 +233,8 @@ class TimesheetServiceTest {
         assertThat(response.getStatus()).isEqualTo("DRAFT");
     }
 
-    // ── TS-08: daily 8h limit enforced ─────────────────────────────────────────
-    @Test
-    void addEntry_exceedsDailyHourLimit_throwsBusinessException() {
-        Project project = new Project();
-        project.setId("proj_001");
-        project.setStatus(Project.ProjectStatus.ACTIVE);
-
-        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
-        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
-        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any()))
-                .thenReturn(java.math.BigDecimal.valueOf(8.0)); // already 8h — any addition exceeds limit
-
-        AddTimeEntryRequest req = new AddTimeEntryRequest();
-        req.setDay(TimeEntry.DayOfWeek.MONDAY);
-        req.setEntryType(TimeEntry.EntryType.WORK);
-        req.setProjectId("proj_001");
-        req.setStartTime(LocalTime.of(8, 0));
-        req.setEndTime(LocalTime.of(9, 0)); // +1h → total 9h
-
-        assertThatThrownBy(() -> timesheetService.addEntry("ts_001", "emp_001", req))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Total daily hours cannot exceed 8");
-    }
+    // ── TS-08: daily 8h limit removed — entries over 8h are now allowed ───────
+    // See toDetailResponse_over8h_singleEntry_splitsCorrectly for overtime computation tests.
 
     // ── TS-09: overlapping time blocks on same day ────────────────────────────
     @Test
@@ -278,8 +255,6 @@ class TimesheetServiceTest {
         when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
         when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
         when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any()))
-                .thenReturn(BigDecimal.valueOf(4.0));
         when(timeEntryRepository.findByTimesheetIdAndDay(any(), any()))
                 .thenReturn(List.of(existingEntry)); // returns conflicting entry
 
@@ -499,9 +474,6 @@ class TimesheetServiceTest {
         when(timeEntryRepository.findById("te_001")).thenReturn(Optional.of(entry));
         // Returns the entry itself — it is excluded from overlap check via excludeEntryId filter
         when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of(entry));
-        // Sum = 4h (current total including this entry)
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any()))
-                .thenReturn(BigDecimal.valueOf(4.0));
         when(timeEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(timeEntryRepository.findByTimesheetId(any())).thenReturn(List.of());
         when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
@@ -601,8 +573,6 @@ class TimesheetServiceTest {
         when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
         when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
         when(projectRepository.findById("proj_001")).thenReturn(Optional.of(project));
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any()))
-                .thenReturn(BigDecimal.valueOf(4.0)); // existing 4h
         when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of());
         when(timeEntryRepository.save(any(TimeEntry.class))).thenAnswer(inv -> {
             TimeEntry e = inv.getArgument(0);
@@ -618,36 +588,13 @@ class TimesheetServiceTest {
         req.setEntryType(TimeEntry.EntryType.WORK);
         req.setProjectId("proj_001");
         req.setStartTime(LocalTime.of(13, 0));
-        req.setEndTime(LocalTime.of(17, 0)); // +4h → total 8h (exactly at boundary)
+        req.setEndTime(LocalTime.of(17, 0)); // +4h — any amount now allowed
         req.setDescription("afternoon work");
 
         assertThatNoException().isThrownBy(() -> timesheetService.addEntry("ts_001", "emp_001", req));
     }
 
-    // ── EDGE-07: add entry that pushes daily total just over 8h ──────────────
-    @Test
-    void addEntry_justOverDailyLimit_throwsBusinessException() {
-        Project project = new Project();
-        project.setId("proj_001");
-        project.setStatus(Project.ProjectStatus.ACTIVE);
-
-        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
-        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
-        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
-        when(timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(any(), any()))
-                .thenReturn(BigDecimal.valueOf(7.5)); // 7.5h existing
-
-        AddTimeEntryRequest req = new AddTimeEntryRequest();
-        req.setDay(TimeEntry.DayOfWeek.MONDAY);
-        req.setEntryType(TimeEntry.EntryType.WORK);
-        req.setProjectId("proj_001");
-        req.setStartTime(LocalTime.of(16, 0));
-        req.setEndTime(LocalTime.of(17, 1)); // 1h1min → total 8.52h > 8h
-
-        assertThatThrownBy(() -> timesheetService.addEntry("ts_001", "emp_001", req))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Total daily hours cannot exceed 8");
-    }
+    // ── EDGE-07 removed: daily 8h cap is no longer enforced (overtime computed at aggregation layer) ─
 
     // ── EDGE-08: employee with no manager — submit succeeds, no notification ──
     @Test
@@ -670,5 +617,704 @@ class TimesheetServiceTest {
 
         verify(timesheetRepository).save(argThat(ts -> ts.getStatus() == Timesheet.TimesheetStatus.SUBMITTED));
         verifyNoInteractions(notificationService); // no manager → no notification sent
+    }
+
+    // ==========================================================================
+    // Daily Overtime Tests
+    // ==========================================================================
+
+    /** Helper: create a WORK entry with the given day and times, hoursLogged recomputed from times. */
+    private TimeEntry createWorkEntry(String id, TimeEntry.DayOfWeek day, LocalTime start, LocalTime end) {
+        TimeEntry e = new TimeEntry();
+        e.setId(id);
+        e.setDay(day);
+        e.setEntryType(TimeEntry.EntryType.WORK);
+        e.setStartTime(start);
+        e.setEndTime(end);
+        long mins = Duration.between(start, end).toMinutes();
+        e.setHoursLogged(BigDecimal.valueOf(mins / 60.0));
+        e.setTimesheet(timesheet);
+        return e;
+    }
+
+    @Test
+    void toDetailResponse_under8h_overtimeIsZero() {
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(15, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var resp = timesheetService.toDetailResponse(timesheet);
+        var monday = resp.getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("6.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+        assertThat(resp.getTotalRegularHours()).isEqualByComparingTo("6.00");
+        assertThat(resp.getTotalOvertimeHours()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void toDetailResponse_exactly8h_overtimeIsZero() {
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(17, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("8.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void toDetailResponse_exactly8h_multipleEntries_overtimeIsZero() {
+        // 4 × 2h entries on Monday = 8h exactly
+        List<TimeEntry> entries = List.of(
+                createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8, 0),  LocalTime.of(10, 0)),
+                createWorkEntry("te_2", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                createWorkEntry("te_3", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(13, 0), LocalTime.of(15, 0)),
+                createWorkEntry("te_4", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(15, 0), LocalTime.of(17, 0))
+        );
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(entries);
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("8.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void toDetailResponse_over8h_singleEntry_splitsCorrectly() {
+        // 10h entry on Monday
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(18, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var resp = timesheetService.toDetailResponse(timesheet);
+        var monday = resp.getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("8.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("2.00");
+        assertThat(resp.getTotalOvertimeHours()).isEqualByComparingTo("2.00");
+    }
+
+    @Test
+    void toDetailResponse_multipleEntriesSumOver8h() {
+        // Mon: 5h + 4.5h = 9.5h → OT 1.5h
+        List<TimeEntry> entries = List.of(
+                createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8,  0), LocalTime.of(13, 0)),
+                createWorkEntry("te_2", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(14, 0), LocalTime.of(18, 30))
+        );
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(entries);
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("8.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("1.50");
+    }
+
+    @Test
+    void toDetailResponse_holidayDay_allFieldsZero() {
+        Holiday holiday = new Holiday();
+        holiday.setId("hol_001");
+        holiday.setName("Test Holiday");
+        holiday.setDate(LocalDate.of(2026, 3, 16)); // Monday of the test timesheet week
+
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(18, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of(holiday));
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("0.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+        assertThat(monday.getTotalHours()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void toDetailResponse_approvedLeaveDay_allFieldsZero() {
+        Leave leave = new Leave();
+        leave.setId("lv_001");
+        leave.setEmployee(employee);
+        leave.setStartDate(LocalDate.of(2026, 3, 16));
+        leave.setEndDate(LocalDate.of(2026, 3, 16));
+        leave.setStatus(Leave.LeaveStatus.APPROVED);
+        leave.setLeaveType(Leave.LeaveType.SICK);
+
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(18, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of(leave));
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("0.00");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void toDetailResponse_submittedTimesheet_overtimeStillComputed() {
+        timesheet.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(18, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var resp = timesheetService.toDetailResponse(timesheet);
+        var monday = resp.getDays().get(0);
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("2.00");
+        assertThat(monday.isEditable()).isFalse(); // still locked
+    }
+
+    @Test
+    void toDetailResponse_rounding_80min_gives1point33() {
+        // 80 minutes = 1h20m → 80/60 = 1.3333... rounds HALF_UP to 1.33
+        TimeEntry entry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(10, 20));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(entry));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var monday = timesheetService.toDetailResponse(timesheet).getDays().get(0);
+        assertThat(monday.getRegularHours()).isEqualByComparingTo("1.33");
+        assertThat(monday.getOvertimeHours()).isEqualByComparingTo("0.00");
+        assertThat(monday.getTotalHours()).isEqualByComparingTo("1.33");
+    }
+
+    @Test
+    void toSummaryResponse_multiDayOvertimeSums() {
+        // Mon=10h (600min), Tue=7h (420min)
+        TimeEntry monEntry = createWorkEntry("te_1", TimeEntry.DayOfWeek.MONDAY,  LocalTime.of(8, 0), LocalTime.of(18, 0));
+        TimeEntry tueEntry = createWorkEntry("te_2", TimeEntry.DayOfWeek.TUESDAY, LocalTime.of(9, 0), LocalTime.of(16, 0));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(monEntry, tueEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var resp = timesheetService.toSummaryResponse(timesheet);
+        assertThat(resp.getTotalRegularHours()).isEqualByComparingTo("15.00"); // 8 + 7
+        assertThat(resp.getTotalOvertimeHours()).isEqualByComparingTo("2.00");  // (10-8) + 0
+        assertThat(resp.getTotalHours()).isEqualByComparingTo("17.00");
+        assertThat(resp.getDays()).isNull(); // summary responses have no days list
+    }
+
+    @Test
+    void updateEntry_over8h_nowAllowed() {
+        TimeEntry entry = new TimeEntry();
+        entry.setId("te_001");
+        entry.setTimesheet(timesheet);
+        entry.setDay(TimeEntry.DayOfWeek.MONDAY);
+        entry.setEntryType(TimeEntry.EntryType.WORK);
+        entry.setStartTime(LocalTime.of(9, 0));
+        entry.setEndTime(LocalTime.of(16, 0));
+        entry.setHoursLogged(BigDecimal.valueOf(7.0));
+
+        // Update to 9h — was blocked by old 8h cap; now allowed
+        UpdateTimeEntryRequest req = new UpdateTimeEntryRequest();
+        req.setStartTime(LocalTime.of(9, 0));
+        req.setEndTime(LocalTime.of(18, 0));
+
+        when(timeEntryRepository.findById("te_001")).thenReturn(Optional.of(entry));
+        when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of(entry));
+        when(timeEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(timeEntryRepository.findByTimesheetId(any())).thenReturn(List.of());
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        assertThatNoException().isThrownBy(() -> timesheetService.updateEntry("te_001", "emp_001", req));
+        verify(timeEntryRepository).save(argThat(e ->
+                e.getHoursLogged().compareTo(BigDecimal.valueOf(9.0)) == 0));
+    }
+
+    // ==========================================================================
+    // Copy Last Week Tests
+    // ==========================================================================
+
+    private TimeEntry createWorkEntryForCopy(String id, TimeEntry.DayOfWeek day,
+                                              LocalTime start, LocalTime end, Project project) {
+        TimeEntry e = createWorkEntry(id, day, start, end);
+        e.setProject(project);
+        return e;
+    }
+
+    private Project activeProject(String id) {
+        Project p = new Project();
+        p.setId(id);
+        p.setName("Project " + id);
+        p.setStatus(Project.ProjectStatus.ACTIVE);
+        return p;
+    }
+
+    private Timesheet sourceTsForPrevWeek() {
+        Timesheet src = new Timesheet();
+        src.setId("ts_src");
+        src.setEmployee(employee);
+        src.setWeekStartDate(LocalDate.of(2026, 3, 9)); // one week before ts_001 (2026-03-16)
+        src.setStatus(Timesheet.TimesheetStatus.DRAFT);
+        return src;
+    }
+
+    @Test
+    void copy_noSourceTimesheet_returnsZeroCopied() {
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any())).thenReturn(Optional.empty());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(0);
+        assertThat(result.getCopySummary().getMessage()).contains("No previous week timesheet found");
+    }
+
+    @Test
+    void copy_sourceWithNoWorkEntries_returnsZeroCopied() {
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        TimeEntry leaveEntry = new TimeEntry();
+        leaveEntry.setId("te_lv");
+        leaveEntry.setEntryType(TimeEntry.EntryType.LEAVE);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(leaveEntry));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(0);
+        assertThat(result.getCopySummary().getMessage()).contains("no work entries");
+    }
+
+    @Test
+    void copy_submittedSource_copiesEntries() {
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        sourceTs.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(0);
+    }
+
+    @Test
+    void copy_targetRejected_copiesEntries() {
+        timesheet.setStatus(Timesheet.TimesheetStatus.REJECTED);
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        assertThatNoException().isThrownBy(
+                () -> timesheetService.copyFromPreviousWeek("ts_001", "emp_001"));
+    }
+
+    @Test
+    void copy_targetSubmitted_throwsBusinessException() {
+        timesheet.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+
+        assertThatThrownBy(() -> timesheetService.copyFromPreviousWeek("ts_001", "emp_001"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("non-DRAFT");
+    }
+
+    @Test
+    void copy_skipHolidayDay() {
+        Holiday holiday = new Holiday();
+        holiday.setId("hol_001");
+        holiday.setDate(LocalDate.of(2026, 3, 16)); // Monday of target week
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of(holiday));
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of(holiday));
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(0);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("HOLIDAY_DAY");
+    }
+
+    @Test
+    void copy_skipApprovedLeave() {
+        Leave leave = new Leave();
+        leave.setId("lv_001");
+        leave.setEmployee(employee);
+        leave.setStartDate(LocalDate.of(2026, 3, 16));
+        leave.setEndDate(LocalDate.of(2026, 3, 16));
+        leave.setStatus(Leave.LeaveStatus.APPROVED);
+        leave.setLeaveType(Leave.LeaveType.CASUAL);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of(leave));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("LEAVE_DAY");
+    }
+
+    @Test
+    void copy_skipCompletedProject() {
+        Project completedProject = new Project();
+        completedProject.setId("prj_done");
+        completedProject.setName("Legacy");
+        completedProject.setStatus(Project.ProjectStatus.COMPLETED);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), completedProject);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(completedProject));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("PROJECT_NOT_ACTIVE");
+    }
+
+    @Test
+    void copy_skipDeletedProject() {
+        Project missingProject = new Project();
+        missingProject.setId("prj_gone");
+        missingProject.setStatus(Project.ProjectStatus.ACTIVE);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), missingProject);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of()); // deleted project — returns empty
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("PROJECT_NOT_ACTIVE");
+    }
+
+    @Test
+    void copy_skipDuplicateEntry_idempotency() {
+        Project project = activeProject("prj_001");
+        TimeEntry existingTarget = createWorkEntryForCopy("te_existing", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project); // identical
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(existingTarget));
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(0);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("DUPLICATE_ENTRY");
+    }
+
+    @Test
+    void copy_skipBoundaryOverlap_exactBoundaryTouch() {
+        // Source: 09:00-13:00 and 13:00-17:00 back-to-back.
+        // STRICT overlap semantics: boundary-touching = conflict → second entry skipped as OVERLAP_STRICT.
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry1 = createWorkEntryForCopy("te_s1", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(13, 0), project);
+        TimeEntry srcEntry2 = createWorkEntryForCopy("te_s2", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(13, 0), LocalTime.of(17, 0), project);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry1, srcEntry2));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("OVERLAP_STRICT");
+    }
+
+    @Test
+    void copy_selfOverlappingSourceEntries_secondEntrySkipped() {
+        // Source: Mon 09:00–11:00 AND Mon 10:00–12:00 (self-overlapping legacy data)
+        // First accepted and added to virtualEntries; second blocked by OVERLAP_STRICT against first
+        Project project = activeProject("prj_001");
+        TimeEntry srcEntry1 = createWorkEntryForCopy("te_s1", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(11, 0), project);
+        TimeEntry srcEntry2 = createWorkEntryForCopy("te_s2", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(10, 0), LocalTime.of(12, 0), project);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry1, srcEntry2));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of()); // target is empty
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("OVERLAP_STRICT");
+    }
+
+    @Test
+    void copy_mixed_partialCopyAndSkips() {
+        // Mon: holiday → skip; Tue: active project → copy; Wed: completed project → skip
+        Holiday holiday = new Holiday();
+        holiday.setId("hol_001");
+        holiday.setDate(LocalDate.of(2026, 3, 16)); // Monday of target week
+
+        Project activeProj   = activeProject("prj_active");
+        Project completedProj = new Project();
+        completedProj.setId("prj_done");
+        completedProj.setName("Completed");
+        completedProj.setStatus(Project.ProjectStatus.COMPLETED);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        TimeEntry srcMon = createWorkEntryForCopy("te_s1", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), activeProj);
+        TimeEntry srcTue = createWorkEntryForCopy("te_s2", TimeEntry.DayOfWeek.TUESDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), activeProj);
+        TimeEntry srcWed = createWorkEntryForCopy("te_s3", TimeEntry.DayOfWeek.WEDNESDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), completedProj);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcMon, srcTue, srcWed));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of(holiday));
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(activeProj, completedProj));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of(holiday));
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(1);  // Tue
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(2); // Mon (holiday) + Wed (completed)
+    }
+
+    @Test
+    void copy_skipOnHoldProject() {
+        Project onHoldProject = new Project();
+        onHoldProject.setId("prj_hold");
+        onHoldProject.setName("On Hold Project");
+        onHoldProject.setStatus(Project.ProjectStatus.ON_HOLD);
+
+        Timesheet sourceTs = sourceTsForPrevWeek();
+        TimeEntry srcEntry = createWorkEntryForCopy("te_src", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), onHoldProject);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src")).thenReturn(List.of(srcEntry));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(onHoldProject));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
+        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
+                .isEqualTo("PROJECT_NOT_ACTIVE");
+    }
+
+    @Test
+    void addEntry_onHoldProject_throwsBusinessException() {
+        Project onHoldProject = new Project();
+        onHoldProject.setId("prj_hold");
+        onHoldProject.setStatus(Project.ProjectStatus.ON_HOLD);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(projectRepository.findById("prj_hold")).thenReturn(Optional.of(onHoldProject));
+        when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of());
+
+        AddTimeEntryRequest req = new AddTimeEntryRequest();
+        req.setDay(TimeEntry.DayOfWeek.MONDAY);
+        req.setEntryType(TimeEntry.EntryType.WORK);
+        req.setProjectId("prj_hold");
+        req.setStartTime(LocalTime.of(9, 0));
+        req.setEndTime(LocalTime.of(17, 0));
+
+        assertThatThrownBy(() -> timesheetService.addEntry("ts_001", "emp_001", req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("inactive project");
+    }
+
+    @Test
+    void copy_futureDayEntry_copied() {
+        // Future dates in the target week are allowed to be copied (no FUTURE_DAY restriction).
+        // Both Mon Mar 30 (past) and Thu Apr 2 (today/future) should be copied.
+        Timesheet targetTs = new Timesheet();
+        targetTs.setId("ts_future");
+        targetTs.setEmployee(employee);
+        targetTs.setWeekStartDate(LocalDate.of(2026, 3, 30));
+        targetTs.setWeekEndDate(LocalDate.of(2026, 4, 3));
+        targetTs.setStatus(Timesheet.TimesheetStatus.DRAFT);
+
+        Timesheet sourceTs = new Timesheet();
+        sourceTs.setId("ts_src_future");
+        sourceTs.setEmployee(employee);
+        sourceTs.setWeekStartDate(LocalDate.of(2026, 3, 23));
+        sourceTs.setStatus(Timesheet.TimesheetStatus.DRAFT);
+
+        Project project = activeProject("prj_001");
+        TimeEntry srcMon = createWorkEntryForCopy("te_mon", TimeEntry.DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);  // Mar 30 — copies
+        TimeEntry srcThu = createWorkEntryForCopy("te_thu", TimeEntry.DayOfWeek.THURSDAY,
+                LocalTime.of(9, 0), LocalTime.of(17, 0), project);  // Apr 2 — also copies
+
+        when(timesheetRepository.findById("ts_future")).thenReturn(Optional.of(targetTs));
+        when(timesheetRepository.findByEmployeeIdAndWeekStartDate(any(), any()))
+                .thenReturn(Optional.of(sourceTs));
+        when(timeEntryRepository.findByTimesheetId("ts_src_future")).thenReturn(List.of(srcMon, srcThu));
+        when(holidayRepository.findByDateBetween(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+        when(timeEntryRepository.findByTimesheetId("ts_future")).thenReturn(List.of());
+        when(projectRepository.findAllById(any())).thenReturn(List.of(project));
+        when(timeEntryRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+
+        var result = timesheetService.copyFromPreviousWeek("ts_future", "emp_001");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(2);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(0);
+    }
+
+    @Test
+    void updateEntry_hoursLogged_precision() {
+        // 61-minute block (09:00-10:01) must be stored as 1.02 using HALF_UP scale-2.
+        // Regression: double arithmetic BigDecimal.valueOf(61 / 60.0) = 1.0166... (wrong precision).
+        TimeEntry entry = new TimeEntry();
+        entry.setId("te_precision");
+        entry.setTimesheet(timesheet);
+        entry.setDay(TimeEntry.DayOfWeek.MONDAY);
+        entry.setEntryType(TimeEntry.EntryType.WORK);
+        entry.setStartTime(LocalTime.of(9, 0));
+        entry.setEndTime(LocalTime.of(10, 0));
+        entry.setHoursLogged(BigDecimal.valueOf(1.0));
+
+        UpdateTimeEntryRequest req = new UpdateTimeEntryRequest();
+        req.setStartTime(LocalTime.of(9, 0));
+        req.setEndTime(LocalTime.of(10, 1));  // 61 minutes
+
+        when(timeEntryRepository.findById("te_precision")).thenReturn(Optional.of(entry));
+        when(timeEntryRepository.findByTimesheetIdAndDay(any(), any())).thenReturn(List.of(entry));
+        when(timeEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(timeEntryRepository.findByTimesheetId(any())).thenReturn(List.of());
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        timesheetService.updateEntry("te_precision", "emp_001", req);
+
+        verify(timeEntryRepository).save(argThat(e ->
+                e.getHoursLogged().compareTo(new BigDecimal("1.02")) == 0));
+    }
+
+    @Test
+    void copy_targetApproved_throwsBusinessException() {
+        // APPROVED timesheets are locked — copy must be blocked just like SUBMITTED
+        timesheet.setStatus(Timesheet.TimesheetStatus.APPROVED);
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+
+        assertThatThrownBy(() -> timesheetService.copyFromPreviousWeek("ts_001", "emp_001"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("non-DRAFT");
+    }
+
+    @Test
+    void copy_accessDenied_throwsAccessDeniedException() {
+        // Timesheet belongs to emp_001; requester is emp_999 — must be rejected
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+
+        assertThatThrownBy(() -> timesheetService.copyFromPreviousWeek("ts_001", "emp_999"))
+                .isInstanceOf(AccessDeniedException.class);
     }
 }

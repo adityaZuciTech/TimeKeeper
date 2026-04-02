@@ -6,7 +6,7 @@ import { markSectionRead } from '../../features/notifications/notificationSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import { fetchHolidays, selectHolidays } from '../../features/holidays/holidaySlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, StatCard } from '../../components/ui'
+import { LoadingSpinner, StatCard, PageTransition } from '../../components/ui'
 import { Plus, CalendarOff, X, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Users, Thermometer, Coffee, Umbrella } from 'lucide-react'
 import { format, parseISO, isAfter, startOfDay, isSameYear } from 'date-fns'
 
@@ -430,6 +430,7 @@ export default function MyLeaves() {
 
   return (
     <Layout>
+      <PageTransition>
 
       {/* ── Page header ───────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -577,6 +578,7 @@ export default function MyLeaves() {
         myLeaves={leaves}
         holidays={holidays}
       />
+      </PageTransition>
     </Layout>
   )
 }

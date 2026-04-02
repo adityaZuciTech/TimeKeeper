@@ -1,10 +1,13 @@
 package com.timekeeper.entity;
 
+import com.timekeeper.converter.DayCommentMapConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -15,6 +18,10 @@ public class Timesheet {
     @Id
     @Column(length = 50)
     private String id;
+
+    @Version
+    @Column(name = "version", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0")
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", referencedColumnName = "id", nullable = false)
@@ -40,6 +47,15 @@ public class Timesheet {
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 
+    /**
+     * Optional per-day overtime comments. Stored as JSON text.
+     * Only populated when overtimeHours > 0 for that day.
+     * Not copied when copying from previous week.
+     */
+    @Column(name = "overtime_comments", columnDefinition = "TEXT")
+    @Convert(converter = DayCommentMapConverter.class)
+    private Map<TimeEntry.DayOfWeek, String> overtimeComments;
+
     @OneToMany(mappedBy = "timesheet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TimeEntry> entries;
 
@@ -48,6 +64,7 @@ public class Timesheet {
         if (id == null) id = "ts_" + UUID.randomUUID().toString().substring(0, 8);
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (status == null) status = TimesheetStatus.DRAFT;
+        if (version == null) version = 0L;
     }
 
     public enum TimesheetStatus {

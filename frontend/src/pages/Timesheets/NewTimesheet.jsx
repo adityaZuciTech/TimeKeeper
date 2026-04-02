@@ -6,6 +6,7 @@ import { format, startOfWeek, addWeeks, subWeeks } from 'date-fns'
 import toast from 'react-hot-toast'
 import { Calendar, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Layout from '../../components/Layout'
+import { PageTransition } from '../../components/ui'
 
 function getMonday(date) {
   return startOfWeek(date, { weekStartsOn: 1 })
@@ -42,6 +43,7 @@ export default function NewTimesheet() {
 
   return (
     <Layout>
+      <PageTransition>
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="bg-card border border-border rounded-2xl shadow-sm p-8 w-full max-w-md">
           <div className="flex items-center gap-3 mb-6">
@@ -99,6 +101,7 @@ export default function NewTimesheet() {
           </div>
         </div>
       </div>
+      </PageTransition>
     </Layout>
   )
 }

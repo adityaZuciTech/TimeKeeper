@@ -2,8 +2,10 @@ package com.timekeeper.controller;
 
 import com.timekeeper.dto.request.AddTimeEntryRequest;
 import com.timekeeper.dto.request.CreateTimesheetRequest;
+import com.timekeeper.dto.request.SaveOvertimeCommentRequest;
 import com.timekeeper.dto.request.UpdateTimeEntryRequest;
 import com.timekeeper.dto.response.ApiResponse;
+import com.timekeeper.dto.response.CopyLastWeekResponse;
 import com.timekeeper.dto.response.TimeEntryResponse;
 import com.timekeeper.dto.response.TimesheetResponse;
 import com.timekeeper.entity.Employee;
@@ -164,5 +166,34 @@ public class TimesheetController {
         TimesheetResponse response = timesheetService.rejectTimesheet(
                 timesheetId, currentUser.getId(), currentUser.getRole(), reason);
         return ResponseEntity.ok(ApiResponse.success("Timesheet rejected", response));
+    }
+
+    // Copy WORK entries from the previous week (MERGE strategy, EMPLOYEE only)
+    @Operation(summary = "Copy WORK entries from previous week",
+               description = "MERGE strategy: only adds entries that do not conflict. Returns updated timesheet and skip summary. Use dryRun=true for a preview without persisting.")
+    @PostMapping("/{timesheetId}/copy-last-week")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<CopyLastWeekResponse>> copyLastWeek(
+            @PathVariable String timesheetId,
+            @RequestParam(defaultValue = "false") boolean dryRun,
+            @AuthenticationPrincipal Employee currentUser) {
+        CopyLastWeekResponse response = dryRun
+                ? timesheetService.previewCopyFromPreviousWeek(timesheetId, currentUser.getId())
+                : timesheetService.copyFromPreviousWeek(timesheetId, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // Save (or clear) an optional overtime comment for a specific day
+    @Operation(summary = "Save overtime comment",
+               description = "Adds or updates an optional comment for a day with overtime. Blank comment removes the stored value. DRAFT/REJECTED timesheets only.")
+    @PatchMapping("/{timesheetId}/overtime-comment")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<TimesheetResponse>> saveOvertimeComment(
+            @PathVariable String timesheetId,
+            @Valid @RequestBody SaveOvertimeCommentRequest request,
+            @AuthenticationPrincipal Employee currentUser) {
+        TimesheetResponse response =
+                timesheetService.saveOvertimeComment(timesheetId, currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

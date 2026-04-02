@@ -8,7 +8,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton, StatCard } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, ConfirmDialog, LoadingButton, StatCard, PageTransition } from '../../components/ui'
 import Modal from '../../components/Modal'
 import PaginationBar from '../../components/PaginationBar'
 import SortableHeader from '../../components/SortableHeader'
@@ -462,6 +462,7 @@ export default function Employees() {
   return (
     <>
     <Layout>
+      <PageTransition>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
@@ -767,6 +768,7 @@ export default function Employees() {
           </div>
         </div>
       </Modal>
+      </PageTransition>
     </Layout>
 
     {/* Deactivate confirmation dialog */}

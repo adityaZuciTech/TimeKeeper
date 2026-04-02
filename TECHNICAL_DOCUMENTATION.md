@@ -1122,12 +1122,11 @@ addEntry(timesheetId, employeeId, request)
 ├── If WORK entry:
 │   ├── Validation: projectId, startTime, endTime are required
 │   ├── Validation: startTime < endTime
-│   ├── Project status check: not COMPLETED
-│   ├── Daily hours check: existing + new <= 8.0 hours
-│   │   └── sumHoursLoggedByTimesheetIdAndDay() — one DB query per day
+│   ├── Project status check: must be ACTIVE (COMPLETED and ON_HOLD blocked)
 │   └── Overlap check: validateNoOverlapExcluding()
 │       └── Loads existing entries for that day, checks time block intersections
-│           Overlap condition: newStart < existEnd AND newEnd > existStart
+│           Overlap condition (exclusive): newStart < existEnd AND newEnd > existStart
+│           Back-to-back entries (e.g. 09:00–11:00 + 11:00–13:00) are allowed
 │
 └── Save entry, return toDetailResponse(timesheet)
 
@@ -1165,6 +1164,37 @@ rejectTimesheet(timesheetId, approverId, approverRole, reason)
 └── status = REJECTED, rejectionReason = reason
     └── Notify employee: TIMESHEET section + reason included in message
 ```
+
+```
+copyFromPreviousWeek(timesheetId, employeeId)
+│
+├── Ownership check: timesheet.employee.id == employeeId
+├── Status check: DRAFT or REJECTED only (SUBMITTED/APPROVED are locked)
+├── Source lookup: weekStartDate - 7 days
+│   └── No source timesheet → return message "No previous week timesheet found"
+│   └── Source has no WORK entries → return message "Previous week has no work entries"
+│
+├── Pre-fetch (4 queries total, no N+1):
+│   ├── holidayRepository.findByDateBetween(targetWeekStart, targetWeekEnd)
+│   ├── leaveRepository.findApprovedLeavesForWeek(employeeId, ...)
+│   ├── timeEntryRepository.findByTimesheetId(targetId) → virtualEntries
+│   └── projectRepository.findAllById(srcProjectIds) → Map<String, Project>
+│
+├── For each source WORK entry (sorted: day asc, startTime asc):
+│   ├── 0. FUTURE_DAY: targetDayDate.isAfter(LocalDate.now()) → skip
+│   ├── a. HOLIDAY_DAY: targetDay ∈ holidayDates → skip
+│   ├── b. LEAVE_DAY: employee on approved leave on targetDay → skip
+│   ├── c. PROJECT_NOT_ACTIVE: project missing or status != ACTIVE → skip
+│   ├── d. DUPLICATE_ENTRY: same (day, projectId, startTime, endTime) in virtualEntries → skip
+│   ├── e. OVERLAP_STRICT: hasBoundaryOverlap() against virtualEntries
+│   │   └── STRICT/inclusive: !newStart.isAfter(existEnd) && !newEnd.isBefore(existStart)
+│   │       Boundary-touching (09:00–11:00 + 11:00–13:00) counts as conflict
+│   └── f. Accept: add to toSave AND virtualEntries (prevents self-overlap in batch)
+│
+├── timeEntryRepository.saveAll(toSave)  — one batch insert
+│
+└── Return CopyLastWeekResponse:
+    { timesheet, copySummary { copiedCount, skippedCount, message, skippedEntries[] } }```
 
 #### Leave Lifecycle
 
@@ -2177,7 +2207,7 @@ ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=prod"]
 >
 > First, **single responsibility**: each layer changes for one reason only. If the database schema changes, only the entity and repository layers change; the business rules in the service layer are untouched.
 >
-> Second, **testability**: we have 30+ unit tests for the service layer that run with Mockito in under 2 seconds — no database, no Spring context. The business rules around timesheet validation (8-hour daily limit, no work on holidays, no overlapping time blocks) are complex enough that you need to test them in isolation. If business logic lived in controllers, you'd need to start the full HTTP stack to test a business rule.
+> Second, **testability**: we have 56+ unit tests for the service layer that run with Mockito in under 2 seconds — no database, no Spring context. The business rules around timesheet validation (no work on holidays, no overlapping time blocks, copy-last-week skip rules) are complex enough that you need to test them in isolation. If business logic lived in controllers, you'd need to start the full HTTP stack to test a business rule.
 >
 > Third, **team parallelism**: the API contract (controller) and business logic (service) can be developed simultaneously by different developers without merge conflicts.
 >

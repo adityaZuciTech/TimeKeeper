@@ -7,7 +7,7 @@ import {
 } from '../../features/leaves/leaveSlice'
 import { markSectionRead } from '../../features/notifications/notificationSlice'
 import Layout from '../../components/Layout'
-import { EmptyState, PageHeader, SkeletonRows } from '../../components/ui'
+import { EmptyState, PageHeader, SkeletonRows, PageTransition } from '../../components/ui'
 import Modal from '../../components/Modal'
 import PaginationBar from '../../components/PaginationBar'
 import SortableHeader from '../../components/SortableHeader'
@@ -104,6 +104,7 @@ export default function TeamLeaves() {
 
   return (
     <Layout>
+      <PageTransition>
       <PageHeader
         title="Team Leave Requests"
         subtitle={pendingCount > 0
@@ -249,6 +250,7 @@ export default function TeamLeaves() {
           </div>
         )}
       </Modal>
+      </PageTransition>
     </Layout>
   )
 }

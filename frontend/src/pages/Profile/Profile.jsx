@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { selectCurrentUser, changePassword } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { PageHeader } from '../../components/ui'
+import { PageHeader, PageTransition } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { User, Mail, Shield, Building2, Lock, Eye, EyeOff, CreditCard, ChevronDown } from 'lucide-react'
 
@@ -57,6 +57,7 @@ export default function Profile() {
 
   return (
     <Layout>
+      <PageTransition>
       <PageHeader title="My Profile" subtitle="Manage your personal information and account settings" />
 
       <div className="max-w-3xl space-y-5">
@@ -211,6 +212,7 @@ export default function Profile() {
         </div>
 
       </div>
+      </PageTransition>
     </Layout>
   )
 }

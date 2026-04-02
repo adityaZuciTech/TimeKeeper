@@ -2,7 +2,11 @@ package com.timekeeper.service;
 
 import com.timekeeper.dto.request.AddTimeEntryRequest;
 import com.timekeeper.dto.request.CreateTimesheetRequest;
+import com.timekeeper.dto.request.SaveOvertimeCommentRequest;
 import com.timekeeper.dto.request.UpdateTimeEntryRequest;
+import com.timekeeper.dto.response.CopyLastWeekResponse;
+import com.timekeeper.dto.response.CopySummary;
+import com.timekeeper.dto.response.SkippedEntryDetail;
 import com.timekeeper.dto.response.TimeEntryResponse;
 import com.timekeeper.dto.response.TimesheetResponse;
 import com.timekeeper.entity.*;
@@ -17,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -88,13 +94,13 @@ public class TimesheetService {
     public List<TimesheetResponse> getMyTimesheets(String employeeId) {
         List<Timesheet> timesheets = timesheetRepository
                 .findTop5ByEmployeeIdOrderByWeekStartDateDesc(employeeId, PageRequest.of(0, 5));
-        return timesheets.stream().map(this::toSummaryResponse).collect(Collectors.toList());
+        return buildBatchedSummaryResponses(timesheets, employeeId);
     }
 
     @Transactional(readOnly = true)
     public List<TimesheetResponse> getAllTimesheets(String employeeId) {
         List<Timesheet> timesheets = timesheetRepository.findByEmployeeIdOrderByWeekStartDateDesc(employeeId);
-        return timesheets.stream().map(this::toSummaryResponse).collect(Collectors.toList());
+        return buildBatchedSummaryResponses(timesheets, employeeId);
     }
 
     @Transactional(readOnly = true)
@@ -103,8 +109,7 @@ public class TimesheetService {
                 PageRequest.of(page, Math.min(size, 50), org.springframework.data.domain.Sort.by("weekStartDate").descending());
         org.springframework.data.domain.Page<Timesheet> tsPage =
                 timesheetRepository.findByEmployeeId(employeeId, pageable);
-        List<TimesheetResponse> content = tsPage.getContent().stream()
-                .map(this::toSummaryResponse).collect(Collectors.toList());
+        List<TimesheetResponse> content = buildBatchedSummaryResponses(tsPage.getContent(), employeeId);
         return Map.of(
                 "timesheets", content,
                 "page", page,
@@ -198,8 +203,8 @@ public class TimesheetService {
 
             Project project = projectRepository.findById(request.getProjectId())
                     .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + request.getProjectId()));
-            if (project.getStatus() == Project.ProjectStatus.COMPLETED) {
-                throw new BusinessException("Cannot log time to a completed project");
+            if (project.getStatus() != Project.ProjectStatus.ACTIVE) {
+                throw new BusinessException("Cannot log time to an inactive project");
             }
 
             entry.setProject(project);
@@ -207,8 +212,9 @@ public class TimesheetService {
             entry.setEndTime(request.getEndTime());
             entry.setDescription(request.getDescription());
 
-            long minutes = java.time.Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
-            entry.setHoursLogged(BigDecimal.valueOf(minutes / 60.0));
+            long minutes = Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
+            entry.setHoursLogged(BigDecimal.valueOf(minutes)
+                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
         } else {
             // LEAVE or HOLIDAY
             removeExistingLeaveEntry(timesheetId, request.getDay());
@@ -216,6 +222,7 @@ public class TimesheetService {
         }
 
         entry = timeEntryRepository.save(entry);
+        clearOvertimeCommentIfNoLongerOT(timesheet, request.getDay());
         return toDetailResponse(timesheet);
     }
 
@@ -244,25 +251,16 @@ public class TimesheetService {
 
         // Validate no overlaps (excluding this entry itself)
         validateNoOverlapExcluding(entry.getTimesheet().getId(), entry.getDay(), newStart, newEnd, entryId);
-
-        // Validate total daily hours
-        BigDecimal currentHours = timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(
-                entry.getTimesheet().getId(), entry.getDay());
-        BigDecimal currentEntryHours = entry.getHoursLogged();
-        long newMinutes = java.time.Duration.between(newStart, newEnd).toMinutes();
-        BigDecimal newHours = BigDecimal.valueOf(newMinutes / 60.0);
-
-        BigDecimal totalAfterUpdate = (currentHours == null ? BigDecimal.ZERO : currentHours)
-                .subtract(currentEntryHours).add(newHours);
-        if (totalAfterUpdate.compareTo(BigDecimal.valueOf(8)) > 0) {
-            throw new BusinessException("Total daily hours cannot exceed 8");
-        }
+        // Daily 8h cap removed — overtime is computed in the aggregation layer.
+        long newMinutes = Duration.between(newStart, newEnd).toMinutes();
+        BigDecimal newHours = BigDecimal.valueOf(newMinutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
 
         if (request.getProjectId() != null) {
             Project project = projectRepository.findById(request.getProjectId())
                     .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + request.getProjectId()));
-            if (project.getStatus() == Project.ProjectStatus.COMPLETED) {
-                throw new BusinessException("Cannot log time to a completed project");
+            if (project.getStatus() != Project.ProjectStatus.ACTIVE) {
+                throw new BusinessException("Cannot log time to an inactive project");
             }
             entry.setProject(project);
         }
@@ -273,6 +271,7 @@ public class TimesheetService {
         if (request.getDescription() != null) entry.setDescription(request.getDescription());
 
         timeEntryRepository.save(entry);
+        clearOvertimeCommentIfNoLongerOT(entry.getTimesheet(), entry.getDay());
         return toDetailResponse(entry.getTimesheet());
     }
 
@@ -290,8 +289,65 @@ public class TimesheetService {
         }
 
         Timesheet timesheet = entry.getTimesheet();
+        TimeEntry.DayOfWeek affectedDay = entry.getDay();
         timeEntryRepository.delete(entry);
+        clearOvertimeCommentIfNoLongerOT(timesheet, affectedDay);
         return toDetailResponse(timesheet);
+    }
+
+    @Transactional
+    public TimesheetResponse saveOvertimeComment(String timesheetId, String employeeId,
+                                                  SaveOvertimeCommentRequest request) {
+        Timesheet timesheet = timesheetRepository.findById(timesheetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
+
+        if (!timesheet.getEmployee().getId().equals(employeeId)) {
+            throw new AccessDeniedException("Access denied");
+        }
+        Timesheet.TimesheetStatus status = timesheet.getStatus();
+        if (status == Timesheet.TimesheetStatus.SUBMITTED || status == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot edit overtime comments on a submitted or approved timesheet");
+        }
+
+        if (timesheet.getOvertimeComments() == null) {
+            timesheet.setOvertimeComments(new EnumMap<>(TimeEntry.DayOfWeek.class));
+        }
+
+        String trimmed = request.getComment() != null ? request.getComment().trim() : "";
+        if (trimmed.isEmpty()) {
+            timesheet.getOvertimeComments().remove(request.getDay());
+        } else {
+            timesheet.getOvertimeComments().put(request.getDay(), trimmed);
+        }
+
+        timesheetRepository.save(timesheet);
+        return toDetailResponse(timesheet);
+    }
+
+    /**
+     * If the given day no longer has overtime after an entry change, remove any stored comment
+     * for that day to avoid stale data. Called after addEntry, updateEntry, and deleteEntry.
+     */
+    private void clearOvertimeCommentIfNoLongerOT(Timesheet timesheet, TimeEntry.DayOfWeek day) {
+        Map<TimeEntry.DayOfWeek, String> comments = timesheet.getOvertimeComments();
+        if (comments == null || !comments.containsKey(day)) return;
+
+        LocalDate weekStart = timesheet.getWeekStartDate();
+        LocalDate dayDate = weekStart.plusDays(DAY_OFFSET.get(day));
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        Set<LocalDate> holidayDates = holidayRepository.findByDateBetween(weekStart, weekEnd)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        List<Leave> leaves = leaveRepository.findApprovedLeavesForWeek(
+                timesheet.getEmployee().getId(), weekStart, weekEnd);
+
+        List<TimeEntry> allEntries = timeEntryRepository.findByTimesheetId(timesheet.getId());
+        DayOvertimeData ot = computeDayOvertime(allEntries, dayDate, holidayDates, leaves);
+
+        if (ot.overtimeHours().compareTo(BigDecimal.ZERO) == 0) {
+            comments.remove(day);
+            timesheetRepository.save(timesheet);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -310,17 +366,7 @@ public class TimesheetService {
         if (!request.getStartTime().isBefore(request.getEndTime())) {
             throw new BusinessException("Start time must be before end time");
         }
-
-        // Check existing daily hours
-        BigDecimal existingHours = timeEntryRepository.sumHoursLoggedByTimesheetIdAndDay(timesheetId, request.getDay());
-        long newMinutes = java.time.Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
-        BigDecimal newHours = BigDecimal.valueOf(newMinutes / 60.0);
-
-        if ((existingHours == null ? BigDecimal.ZERO : existingHours).add(newHours)
-                .compareTo(BigDecimal.valueOf(8)) > 0) {
-            throw new BusinessException("Total daily hours cannot exceed 8");
-        }
-
+        // Daily 8h cap removed — overtime is computed in the aggregation layer.
         validateNoOverlapExcluding(timesheetId, request.getDay(), request.getStartTime(), request.getEndTime(), null);
     }
 
@@ -385,13 +431,13 @@ public class TimesheetService {
         }
 
         List<TimesheetResponse.DayResponse> days = new ArrayList<>();
-        BigDecimal totalHours = BigDecimal.ZERO;
+        BigDecimal totalRegularHours = BigDecimal.ZERO;
+        BigDecimal totalOvertimeHours = BigDecimal.ZERO;
         int dayIndex = 0;
 
         for (Map.Entry<TimeEntry.DayOfWeek, List<TimeEntry>> dayEntry : byDay.entrySet()) {
             LocalDate dayDate = weekStart.plusDays(dayIndex++);
             List<TimeEntry> dayEntries = dayEntry.getValue();
-            BigDecimal dayHours = BigDecimal.ZERO;
 
             // Priority: HOLIDAY > LEAVE > WORK (from entries)
             String dayStatus = "WORK";
@@ -420,10 +466,15 @@ public class TimesheetService {
 
             boolean editable = !isLocked && dayStatus.equals("WORK") && !dayDate.isAfter(LocalDate.now());
 
-            for (TimeEntry e : dayEntries) {
-                if (e.getHoursLogged() != null) dayHours = dayHours.add(e.getHoursLogged());
-            }
-            totalHours = totalHours.add(dayHours);
+            DayOvertimeData overtime = computeDayOvertime(allEntries, dayDate, holidayDates, weekLeaves);
+            totalRegularHours = totalRegularHours.add(overtime.regularHours());
+            totalOvertimeHours = totalOvertimeHours.add(overtime.overtimeHours());
+
+            // Resolve overtime comment — only exposed when day actually has overtime
+            Map<TimeEntry.DayOfWeek, String> commentMap = timesheet.getOvertimeComments();
+            TimeEntry.DayOfWeek dayKey = dayEntry.getKey();
+            String overtimeComment = (overtime.overtimeHours().compareTo(BigDecimal.ZERO) > 0 && commentMap != null)
+                    ? commentMap.get(dayKey) : null;
 
             List<TimeEntryResponse> entryResponses = dayEntries.stream()
                     .map(this::toEntryResponse)
@@ -431,11 +482,14 @@ public class TimesheetService {
 
             days.add(TimesheetResponse.DayResponse.builder()
                     .day(dayEntry.getKey().name())
-                    .totalHours(dayHours)
+                    .totalHours(overtime.workHours())
+                    .regularHours(overtime.regularHours())
+                    .overtimeHours(overtime.overtimeHours())
                     .dayStatus(dayStatus)
                     .leaveType(leaveType)
                     .leaveId(leaveId)
                     .editable(editable)
+                    .overtimeComment(overtimeComment)
                     .entries(entryResponses)
                     .build());
         }
@@ -446,7 +500,9 @@ public class TimesheetService {
                 .employeeName(timesheet.getEmployee().getName())
                 .weekStartDate(timesheet.getWeekStartDate())
                 .weekEndDate(timesheet.getWeekEndDate())
-                .totalHours(totalHours)
+                .totalHours(totalRegularHours.add(totalOvertimeHours))
+                .totalRegularHours(totalRegularHours)
+                .totalOvertimeHours(totalOvertimeHours)
                 .status(timesheet.getStatus().name())
                 .approvedBy(timesheet.getApprovedBy())
                 .approvedByName(resolveApproverName(timesheet.getApprovedBy()))
@@ -456,14 +512,64 @@ public class TimesheetService {
     }
 
     public TimesheetResponse toSummaryResponse(Timesheet timesheet) {
-        BigDecimal total = timeEntryRepository.sumHoursLoggedByTimesheetId(timesheet.getId());
+        List<TimeEntry> entries = timeEntryRepository.findByTimesheetId(timesheet.getId());
+        LocalDate start = timesheet.getWeekStartDate();
+        LocalDate end   = start.plusDays(4);
+        Set<LocalDate> holidayDates = holidayRepository.findByDateBetween(start, end)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        List<Leave> leaves = leaveRepository.findApprovedLeavesForWeek(
+                timesheet.getEmployee().getId(), start, end);
+        return toSummaryResponseWithData(timesheet, entries, holidayDates, leaves);
+    }
+
+    // --- Batch summary builder used by all list methods (3 queries regardless of page size) ---
+
+    private List<TimesheetResponse> buildBatchedSummaryResponses(List<Timesheet> timesheets,
+                                                                   String employeeId) {
+        if (timesheets.isEmpty()) return List.of();
+
+        List<String> ids = timesheets.stream().map(Timesheet::getId).collect(Collectors.toList());
+        List<TimeEntry> allEntries = timeEntryRepository.findByTimesheetIdIn(ids);
+        Map<String, List<TimeEntry>> entriesByTs = allEntries.stream()
+                .collect(Collectors.groupingBy(e -> e.getTimesheet().getId()));
+
+        LocalDate minStart = timesheets.stream()
+                .map(Timesheet::getWeekStartDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate maxEnd = timesheets.stream()
+                .map(Timesheet::getWeekEndDate).max(LocalDate::compareTo).orElseThrow();
+
+        Set<LocalDate> holidayDates = holidayRepository.findByDateBetween(minStart, maxEnd)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        List<Leave> leaves = leaveRepository.findApprovedLeavesForWeek(employeeId, minStart, maxEnd);
+
+        return timesheets.stream()
+                .map(ts -> toSummaryResponseWithData(
+                        ts,
+                        entriesByTs.getOrDefault(ts.getId(), List.of()),
+                        holidayDates,
+                        leaves))
+                .collect(Collectors.toList());
+    }
+
+    private TimesheetResponse toSummaryResponseWithData(Timesheet timesheet, List<TimeEntry> entries,
+                                                         Set<LocalDate> holidayDates, List<Leave> leaves) {
+        LocalDate weekStart = timesheet.getWeekStartDate();
+        BigDecimal totalRegularHours  = BigDecimal.ZERO;
+        BigDecimal totalOvertimeHours = BigDecimal.ZERO;
+        for (int i = 0; i < 5; i++) {
+            DayOvertimeData data = computeDayOvertime(entries, weekStart.plusDays(i), holidayDates, leaves);
+            totalRegularHours  = totalRegularHours.add(data.regularHours());
+            totalOvertimeHours = totalOvertimeHours.add(data.overtimeHours());
+        }
         return TimesheetResponse.builder()
                 .id(timesheet.getId())
                 .employeeId(timesheet.getEmployee().getId())
                 .employeeName(timesheet.getEmployee().getName())
                 .weekStartDate(timesheet.getWeekStartDate())
                 .weekEndDate(timesheet.getWeekEndDate())
-                .totalHours(total != null ? total : BigDecimal.ZERO)
+                .totalHours(totalRegularHours.add(totalOvertimeHours))
+                .totalRegularHours(totalRegularHours)
+                .totalOvertimeHours(totalOvertimeHours)
                 .status(timesheet.getStatus().name())
                 .approvedBy(timesheet.getApprovedBy())
                 .rejectionReason(timesheet.getRejectionReason())
@@ -573,5 +679,284 @@ public class TimesheetService {
                 .hoursLogged(entry.getHoursLogged())
                 .description(entry.getDescription())
                 .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Overtime computation helpers
+    // -------------------------------------------------------------------------
+
+    private record DayOvertimeData(BigDecimal workHours, BigDecimal regularHours, BigDecimal overtimeHours) {}
+
+    /**
+     * Computes overtime data for a single calendar day.
+     * <p>
+     * Rules:
+     * <ul>
+     *   <li>HOLIDAY or APPROVED LEAVE days → all fields 0.00</li>
+     *   <li>Only WORK entries with non-null startTime/endTime contribute</li>
+     *   <li>Arithmetic is done in minutes to avoid floating-point accumulation</li>
+     *   <li>Results are rounded HALF_UP to 2 decimal places</li>
+     * </ul>
+     */
+    private DayOvertimeData computeDayOvertime(List<TimeEntry> allEntries, LocalDate dayDate,
+                                                Set<LocalDate> holidayDates, List<Leave> approvedLeaves) {
+        if (holidayDates.contains(dayDate)) {
+            return new DayOvertimeData(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        for (Leave leave : approvedLeaves) {
+            if (!dayDate.isBefore(leave.getStartDate()) && !dayDate.isAfter(leave.getEndDate())) {
+                return new DayOvertimeData(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+            }
+        }
+
+        // Convert java.time.DayOfWeek to the custom TimeEntry.DayOfWeek enum (same name strings)
+        TimeEntry.DayOfWeek customDay = TimeEntry.DayOfWeek.valueOf(dayDate.getDayOfWeek().name());
+
+        long totalMinutes = 0;
+        for (TimeEntry entry : allEntries) {
+            if (entry.getDay() == customDay && entry.getEntryType() == TimeEntry.EntryType.WORK
+                    && entry.getStartTime() != null && entry.getEndTime() != null) {
+                totalMinutes += Duration.between(entry.getStartTime(), entry.getEndTime()).toMinutes();
+            }
+        }
+
+        long regularMinutes  = Math.min(totalMinutes, 480);
+        long overtimeMinutes = Math.max(totalMinutes - 480, 0);
+
+        BigDecimal regularHours  = BigDecimal.valueOf(regularMinutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal overtimeHours = BigDecimal.valueOf(overtimeMinutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal workHours = regularHours.add(overtimeHours);
+
+        return new DayOvertimeData(workHours, regularHours, overtimeHours);
+    }
+
+    // -------------------------------------------------------------------------
+    // Copy Last Week feature
+    // -------------------------------------------------------------------------
+
+    /**
+     * MERGE copy of WORK entries from the immediately preceding week into the target timesheet.
+     * Idempotent: re-running produces copiedCount=0 (all entries already exist as DUPLICATE_ENTRY).
+     */
+    @Transactional
+    public CopyLastWeekResponse copyFromPreviousWeek(String timesheetId, String employeeId) {
+        return doCopyFromPreviousWeek(timesheetId, employeeId, false);
+    }
+
+    /**
+     * Dry-run variant — runs in a read-only transaction so Hibernate can never flush
+     * the transient TimeEntry objects, regardless of CascadeType.ALL on Timesheet.entries.
+     */
+    @Transactional(readOnly = true)
+    public CopyLastWeekResponse previewCopyFromPreviousWeek(String timesheetId, String employeeId) {
+        return doCopyFromPreviousWeek(timesheetId, employeeId, true);
+    }
+
+    private CopyLastWeekResponse doCopyFromPreviousWeek(String timesheetId, String employeeId, boolean dryRun) {
+        Timesheet timesheet = timesheetRepository.findById(timesheetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found: " + timesheetId));
+
+        if (!timesheet.getEmployee().getId().equals(employeeId)) {
+            throw new AccessDeniedException("Access denied");
+        }
+
+        Timesheet.TimesheetStatus status = timesheet.getStatus();
+        if (status == Timesheet.TimesheetStatus.SUBMITTED || status == Timesheet.TimesheetStatus.APPROVED) {
+            throw new BusinessException("Cannot copy into a non-DRAFT timesheet");
+        }
+
+        LocalDate sourceWeekStart = timesheet.getWeekStartDate().minusDays(7);
+        Optional<Timesheet> sourceOptional =
+                timesheetRepository.findByEmployeeIdAndWeekStartDate(employeeId, sourceWeekStart);
+
+        if (sourceOptional.isEmpty()) {
+            return CopyLastWeekResponse.builder()
+                    .timesheet(dryRun ? null : toDetailResponse(timesheet))
+                    .copySummary(CopySummary.builder()
+                            .copiedCount(0).skippedCount(0)
+                            .sourceWeekStart(sourceWeekStart.toString())
+                            .message("No previous week timesheet found")
+                            .skippedEntries(List.of())
+                            .pendingEntries(List.of()).build())
+                    .build();
+        }
+
+        List<TimeEntry> sourceEntries = timeEntryRepository.findByTimesheetId(sourceOptional.get().getId())
+                .stream().filter(e -> e.getEntryType() == TimeEntry.EntryType.WORK)
+                .collect(Collectors.toList());
+
+        if (sourceEntries.isEmpty()) {
+            return CopyLastWeekResponse.builder()
+                    .timesheet(dryRun ? null : toDetailResponse(timesheet))
+                    .copySummary(CopySummary.builder()
+                            .copiedCount(0).skippedCount(0)
+                            .sourceWeekStart(sourceWeekStart.toString())
+                            .message("Previous week has no work entries")
+                            .skippedEntries(List.of())
+                            .pendingEntries(List.of()).build())
+                    .build();
+        }
+
+        // Pre-fetch target week data (3 queries)
+        LocalDate targetWeekStart = timesheet.getWeekStartDate();
+        LocalDate targetWeekEnd   = timesheet.getWeekEndDate();
+
+        Set<LocalDate> targetHolidayDates = holidayRepository.findByDateBetween(targetWeekStart, targetWeekEnd)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        List<Leave> targetLeaves = leaveRepository.findApprovedLeavesForWeek(
+                employeeId, targetWeekStart, targetWeekEnd);
+
+        // Mutable virtual list: pre-populated with existing WORK entries; updated as entries are accepted.
+        // Critical for preventing duplicate saves when source week contains self-overlapping entries.
+        List<TimeEntry> virtualEntries = new ArrayList<>(
+                timeEntryRepository.findByTimesheetId(timesheetId).stream()
+                        .filter(e -> e.getEntryType() == TimeEntry.EntryType.WORK)
+                        .collect(Collectors.toList()));
+
+        // Pre-fetch all referenced projects in one query instead of one-per-entry
+        Set<String> srcProjectIds = sourceEntries.stream()
+                .map(e -> e.getProject().getId())
+                .collect(Collectors.toSet());
+        Map<String, Project> projectMap = projectRepository.findAllById(srcProjectIds)
+                .stream().collect(Collectors.toMap(Project::getId, p -> p));
+
+        // Sort: day ordinal ascending, then startTime ascending (null-safe)
+        sourceEntries.sort(Comparator
+                .comparingInt((TimeEntry e) -> e.getDay().ordinal())
+                .thenComparing(e -> e.getStartTime() != null ? e.getStartTime() : LocalTime.MIN));
+
+        List<TimeEntry>          toSave  = new ArrayList<>();
+        List<SkippedEntryDetail> skipped = new ArrayList<>();
+
+        for (TimeEntry se : sourceEntries) {
+            // Null-guard: silently skip corrupt/seed entries (not counted in skipped)
+            if (se.getStartTime() == null || se.getEndTime() == null) {
+                continue;
+            }
+
+            LocalDate targetDayDate = targetWeekStart.plusDays(DAY_OFFSET.get(se.getDay()));
+
+            // a. HOLIDAY
+            if (targetHolidayDates.contains(targetDayDate)) {
+                skipped.add(buildSkippedDetail(se, "HOLIDAY_DAY", null));
+                continue;
+            }
+
+            // b. LEAVE
+            boolean onLeave = false;
+            for (Leave leave : targetLeaves) {
+                if (!targetDayDate.isBefore(leave.getStartDate()) && !targetDayDate.isAfter(leave.getEndDate())) {
+                    onLeave = true;
+                    break;
+                }
+            }
+            if (onLeave) {
+                skipped.add(buildSkippedDetail(se, "LEAVE_DAY", null));
+                continue;
+            }
+
+            // c. Project check: missing or not ACTIVE (covers COMPLETED and ON_HOLD)
+            Project resolvedProject = projectMap.get(se.getProject().getId());
+            if (resolvedProject == null || resolvedProject.getStatus() != Project.ProjectStatus.ACTIVE) {
+                skipped.add(buildSkippedDetail(se, "PROJECT_NOT_ACTIVE", null));
+                continue;
+            }
+
+            // d. Duplicate (same project + start + end already in virtualEntries)
+            String srcProjectId = se.getProject().getId();
+            boolean isDuplicate = virtualEntries.stream().anyMatch(ve ->
+                    ve.getDay() == se.getDay()
+                    && ve.getProject() != null
+                    && ve.getProject().getId().equals(srcProjectId)
+                    && se.getStartTime().equals(ve.getStartTime())
+                    && se.getEndTime().equals(ve.getEndTime()));
+            if (isDuplicate) {
+                skipped.add(buildSkippedDetail(se, "DUPLICATE_ENTRY", null));
+                continue;
+            }
+
+            // e. STRICT overlap (boundary-touching = overlap)
+            TimeEntry conflictEntry = null;
+            for (TimeEntry ve : virtualEntries) {
+                if (ve.getDay() == se.getDay() && ve.getStartTime() != null && ve.getEndTime() != null) {
+                    if (hasBoundaryOverlap(se.getStartTime(), se.getEndTime(),
+                            ve.getStartTime(), ve.getEndTime())) {
+                        conflictEntry = ve;
+                        break;
+                    }
+                }
+            }
+            if (conflictEntry != null) {
+                String conflictRange = conflictEntry.getStartTime() + "\u2013" + conflictEntry.getEndTime();
+                skipped.add(buildSkippedDetail(se, "OVERLAP_STRICT", conflictRange));
+                continue;
+            }
+
+            // f. Accept entry
+            long minutes = Duration.between(se.getStartTime(), se.getEndTime()).toMinutes();
+            BigDecimal hours = BigDecimal.valueOf(minutes)
+                    .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+
+            TimeEntry newEntry = TimeEntry.builder()
+                    .timesheet(timesheet)
+                    .project(resolvedProject)
+                    .day(se.getDay())
+                    .entryType(TimeEntry.EntryType.WORK)
+                    .startTime(se.getStartTime())
+                    .endTime(se.getEndTime())
+                    .hoursLogged(hours)
+                    .description(se.getDescription())
+                    .build();
+            toSave.add(newEntry);
+            virtualEntries.add(newEntry); // update virtual list for subsequent iteration checks
+        }
+
+        if (!dryRun) {
+            timeEntryRepository.saveAll(toSave);
+        }
+
+        List<SkippedEntryDetail> pending = toSave.stream()
+                .map(e -> buildSkippedDetail(e, null, null))
+                .collect(Collectors.toList());
+
+        return CopyLastWeekResponse.builder()
+                .timesheet(dryRun ? null : toDetailResponse(timesheet))
+                .copySummary(CopySummary.builder()
+                        .copiedCount(toSave.size())
+                        .skippedCount(skipped.size())
+                        .sourceWeekStart(sourceWeekStart.toString())
+                        .message(null)
+                        .pendingEntries(pending)
+                        .skippedEntries(skipped)
+                        .build())
+                .build();
+    }
+
+    private SkippedEntryDetail buildSkippedDetail(TimeEntry se, String reason, String conflictingRange) {
+        return SkippedEntryDetail.builder()
+                .day(se.getDay().name())
+                .projectId(se.getProject() != null ? se.getProject().getId() : null)
+                .projectName(se.getProject() != null ? se.getProject().getName() : null)
+                .startTime(se.getStartTime() != null ? se.getStartTime().toString() : null)
+                .endTime(se.getEndTime() != null ? se.getEndTime().toString() : null)
+                .reason(reason)
+                .conflictingRange(conflictingRange)
+                .build();
+    }
+
+    /**
+     * Overlap check used by the copy path — STRICT inclusive semantics.
+     * <p>
+     * Boundary-touching entries (e.g., 09:00–13:00 and 13:00–17:00) ARE considered
+     * overlapping: the shared boundary point means they cannot both occupy the same slot.
+     * Condition: newStart &lt;= existEnd AND newEnd &gt;= existStart (both inclusive).
+     */
+    private boolean hasBoundaryOverlap(LocalTime newStart, LocalTime newEnd,
+                                        LocalTime existStart, LocalTime existEnd) {
+        // !newStart.isAfter(existEnd)  ≡  newStart <= existEnd
+        // !newEnd.isBefore(existStart) ≡  newEnd   >= existStart
+        return !newStart.isAfter(existEnd) && !newEnd.isBefore(existStart);
     }
 }

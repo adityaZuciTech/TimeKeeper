@@ -7,7 +7,7 @@ import {
 } from '../../features/timesheets/timesheetSlice'
 import { markSectionRead } from '../../features/notifications/notificationSlice'
 import Layout from '../../components/Layout'
-import { StatCard, EmptyState, SkeletonRows } from '../../components/ui'
+import { StatCard, EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import { format, isThisWeek, isPast, parseISO, getWeek } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
@@ -135,7 +135,14 @@ function FeaturedCard({ ts, onOpen }) {
             </div>
             <p className="font-semibold text-foreground">{weekLabel}</p>
           </div>
-          <StatusBadge status={effectiveStatus} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <StatusBadge status={effectiveStatus} />
+            {Number(ts.totalOvertimeHours ?? 0) > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                OT: {Number(ts.totalOvertimeHours).toFixed(2)}h
+              </span>
+            )}
+          </div>
         </div>
 
         {/* big numbers */}
@@ -211,12 +218,14 @@ function WeekCard({ ts, onOpen }) {
           <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Week {weekNum}</p>
           <p className="text-sm font-semibold text-foreground truncate">{weekLabel}</p>
         </div>
-        <StatusBadge status={effectiveStatus} />
-      </div>
-
-      {/* hours */}
-      <div className="flex items-baseline gap-1 mb-3">
-        <span className="text-2xl font-bold text-foreground tabular-nums">{hours.toFixed(1)}</span>
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <StatusBadge status={effectiveStatus} />
+            {Number(ts.totalOvertimeHours ?? 0) > 0 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                OT: {Number(ts.totalOvertimeHours).toFixed(2)}h
+              </span>
+            )}
+          </div>
         <span className="text-xs text-muted-foreground">/ 40h</span>
       </div>
 
@@ -294,6 +303,7 @@ export default function Timesheets() {
 
   return (
     <Layout>
+      <PageTransition>
       {/* page header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
@@ -396,6 +406,7 @@ export default function Timesheets() {
           )}
         </>
       )}
+      </PageTransition>
     </Layout>
   )
 }

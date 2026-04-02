@@ -8,7 +8,7 @@ import { selectEmployees, fetchEmployees } from '../../features/employees/employ
 import { departmentService } from '../../services/departmentService'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import Modal from '../../components/Modal'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -540,6 +540,7 @@ export default function Departments() {
 
   return (
     <Layout>
+      <PageTransition>
       <div className="space-y-6">
 
         {/* -- Page header --------------------------------------------------- */}
@@ -705,6 +706,7 @@ export default function Departments() {
           </div>
         </div>
       </Modal>
+      </PageTransition>
     </Layout>
   )
 }

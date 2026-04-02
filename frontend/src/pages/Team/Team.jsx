@@ -6,7 +6,7 @@ import { selectCurrentUser } from '../../features/auth/authSlice'
 import { markSectionRead } from '../../features/notifications/notificationSlice'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import { format } from 'date-fns'
 import {
   Users, TrendingUp, AlertTriangle, Clock,
@@ -247,6 +247,7 @@ export default function Team() {
 
   return (
     <Layout>
+      <PageTransition>
       {/* header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
@@ -373,6 +374,7 @@ export default function Team() {
           )}
         </>
       )}
+      </PageTransition>
     </Layout>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { employeeService } from '../../services/employeeService'
 import Layout from '../../components/Layout'
-import { StatusBadge, SkeletonRows, EmptyState } from '../../components/ui'
+import { StatusBadge, SkeletonRows, EmptyState, PageTransition } from '../../components/ui'
 import PaginationBar from '../../components/PaginationBar'
 import SortableHeader from '../../components/SortableHeader'
 import { FileText, ArrowLeft } from 'lucide-react'
@@ -60,6 +60,7 @@ export default function TeamMemberTimesheets() {
 
   return (
     <Layout>
+      <PageTransition>
       <div className="mb-7">
         <button
           onClick={() => navigate(-1)}
@@ -125,6 +126,7 @@ export default function TeamMemberTimesheets() {
           )}
         </div>
       )}
+      </PageTransition>
     </Layout>
   )
 }

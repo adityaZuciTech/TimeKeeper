@@ -7,7 +7,7 @@ import {
 } from '../../features/holidays/holidaySlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState } from '../../components/ui'
+import { EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import Modal from '../../components/Modal'
 import {
   Plus, CalendarDays, MoreVertical, Trash2,
@@ -280,6 +280,7 @@ export default function Holidays() {
 
   return (
     <Layout>
+      <PageTransition>
       {/* page header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
@@ -296,7 +297,7 @@ export default function Holidays() {
         )}
       </div>
 
-      {loading ? <LoadingSpinner /> : (
+      {loading ? <SkeletonRows rows={7} cols={4} /> : (
         holidays.length === 0 ? (
           <EmptyState
             icon={CalendarDays}
@@ -431,6 +432,7 @@ export default function Holidays() {
           </div>
         </div>
       </Modal>
+      </PageTransition>
     </Layout>
   )
 }

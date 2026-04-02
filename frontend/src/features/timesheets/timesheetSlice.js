@@ -92,6 +92,33 @@ export const rejectTimesheet = createAsyncThunk('timesheets/reject', async ({ id
   }
 })
 
+export const copyLastWeek = createAsyncThunk('timesheets/copyLastWeek', async (timesheetId, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.copyLastWeek(timesheetId)
+    return response.data.data // { timesheet, copySummary }
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to copy entries')
+  }
+})
+
+export const previewCopyLastWeek = createAsyncThunk('timesheets/previewCopyLastWeek', async (timesheetId, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.previewCopyLastWeek(timesheetId)
+    return response.data.data // { timesheet: null, copySummary }
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to preview copy')
+  }
+})
+
+export const saveOvertimeComment = createAsyncThunk('timesheets/saveOvertimeComment', async ({ timesheetId, day, comment }, { rejectWithValue }) => {
+  try {
+    const response = await timesheetService.saveOvertimeComment(timesheetId, { day, comment })
+    return response.data.data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to save comment')
+  }
+})
+
 const timesheetSlice = createSlice({
   name: 'timesheets',
   initialState: {
@@ -99,13 +126,21 @@ const timesheetSlice = createSlice({
     allTimesheets: [],
     allTimesheetsMeta: { page: 0, totalPages: 0, totalElements: 0 },
     currentTimesheet: null,
+    // Ephemeral copy summary — cleared on re-fetch, re-copy, and submit.
+    // Not persisted. Shown in CopySummaryPanel only when skippedCount > 0.
+    copySummary: null,
+    copyPreview: null,
     loading: false,
+    copyLoading: false,
+    copyPreviewLoading: false,
     entriesLoading: false,
     error: null,
   },
   reducers: {
     clearError: (state) => { state.error = null },
     clearCurrentTimesheet: (state) => { state.currentTimesheet = null },
+    clearCopySummary: (state) => { state.copySummary = null },
+    clearCopyPreview: (state) => { state.copyPreview = null },
   },
   extraReducers: (builder) => {
     builder
@@ -136,6 +171,8 @@ const timesheetSlice = createSlice({
       .addCase(fetchTimesheetById.fulfilled, (state, action) => {
         state.loading = false
         state.currentTimesheet = action.payload
+        state.copySummary = null  // clear stale summary when navigating to a timesheet
+        state.copyPreview = null  // clear stale preview when navigating
       })
       .addCase(fetchTimesheetById.rejected, (state, action) => {
         state.loading = false
@@ -146,6 +183,7 @@ const timesheetSlice = createSlice({
       })
       .addCase(submitTimesheet.fulfilled, (state, action) => {
         state.currentTimesheet = action.payload
+        state.copySummary = null // clear summary on submit
         state.myTimesheets = state.myTimesheets.map(ts =>
           ts.id === action.payload.id ? { ...ts, status: action.payload.status } : ts
         )
@@ -201,16 +239,43 @@ const timesheetSlice = createSlice({
       .addCase(deleteEntry.fulfilled, (state, action) => {
         state.currentTimesheet = action.payload
       })
+      .addCase(copyLastWeek.pending, (state) => { state.copyLoading = true; state.error = null })
+      .addCase(copyLastWeek.fulfilled, (state, action) => {
+        state.copyLoading = false
+        state.copyPreview = null
+        state.currentTimesheet = action.payload.timesheet
+        state.copySummary = action.payload.copySummary
+      })
+      .addCase(copyLastWeek.rejected, (state, action) => {
+        state.copyLoading = false
+        state.error = action.payload
+      })
+      .addCase(previewCopyLastWeek.pending, (state) => { state.copyPreviewLoading = true; state.error = null })
+      .addCase(previewCopyLastWeek.fulfilled, (state, action) => {
+        state.copyPreviewLoading = false
+        state.copyPreview = action.payload.copySummary
+      })
+      .addCase(previewCopyLastWeek.rejected, (state, action) => {
+        state.copyPreviewLoading = false
+        state.error = action.payload
+      })
+      .addCase(saveOvertimeComment.fulfilled, (state, action) => {
+        state.currentTimesheet = action.payload
+      })
   },
 })
 
-export const { clearError, clearCurrentTimesheet } = timesheetSlice.actions
+export const { clearError, clearCurrentTimesheet, clearCopySummary, clearCopyPreview } = timesheetSlice.actions
 export default timesheetSlice.reducer
 
 export const selectMyTimesheets = (state) => state.timesheets.myTimesheets
 export const selectAllTimesheets = (state) => state.timesheets.allTimesheets
 export const selectAllTimesheetsMeta = (state) => state.timesheets.allTimesheetsMeta
 export const selectCurrentTimesheet = (state) => state.timesheets.currentTimesheet
+export const selectCopySummary = (state) => state.timesheets.copySummary
+export const selectCopyPreview = (state) => state.timesheets.copyPreview
+export const selectCopyLoading = (state) => state.timesheets.copyLoading
+export const selectCopyPreviewLoading = (state) => state.timesheets.copyPreviewLoading
 export const selectTimesheetsLoading = (state) => state.timesheets.loading
 export const selectEntriesLoading = (state) => state.timesheets.entriesLoading
 export const selectTimesheetError = (state) => state.timesheets.error

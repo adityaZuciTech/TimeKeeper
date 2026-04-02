@@ -7,7 +7,7 @@ import {
 import { fetchDepartments, selectDepartments } from '../../features/departments/departmentSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { LoadingSpinner, EmptyState, SkeletonRows, StatCard } from '../../components/ui'
+import { LoadingSpinner, EmptyState, SkeletonRows, StatCard, PageTransition } from '../../components/ui'
 import Modal from '../../components/Modal'
 import { reportService } from '../../services/reportService'
 import toast from 'react-hot-toast'
@@ -444,6 +444,7 @@ export default function Projects() {
   // -- Render -----------------------------------------------------------------
   return (
     <Layout>
+      <PageTransition>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
@@ -705,6 +706,7 @@ export default function Projects() {
           </div>
         </div>
       </Modal>
+      </PageTransition>
     </Layout>
   )
 }

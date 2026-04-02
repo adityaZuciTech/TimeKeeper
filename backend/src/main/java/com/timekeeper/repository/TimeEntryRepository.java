@@ -7,11 +7,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
 public interface TimeEntryRepository extends JpaRepository<TimeEntry, String> {
     List<TimeEntry> findByTimesheetId(String timesheetId);
+
+    /** Batch-load entries for multiple timesheets in a single query — used by list/summary endpoints. */
+    List<TimeEntry> findByTimesheetIdIn(Collection<String> timesheetIds);
+
     List<TimeEntry> findByTimesheetIdAndDay(String timesheetId, TimeEntry.DayOfWeek day);
 
     @Query("SELECT SUM(te.hoursLogged) FROM TimeEntry te WHERE te.timesheet.id = :timesheetId AND te.day = :day AND te.entryType = 'WORK'")

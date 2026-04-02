@@ -3,18 +3,24 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   fetchTimesheetById, submitTimesheet, addEntry, updateEntry, deleteEntry,
-  approveTimesheet, rejectTimesheet,
-  selectCurrentTimesheet, selectTimesheetsLoading, selectEntriesLoading, selectTimesheetError, clearError
+  approveTimesheet, rejectTimesheet, copyLastWeek, clearCopySummary,
+  previewCopyLastWeek, clearCopyPreview, saveOvertimeComment,
+  selectCurrentTimesheet, selectTimesheetsLoading, selectEntriesLoading, selectTimesheetError,
+  clearError, selectCopySummary, selectCopyLoading, selectCopyPreview, selectCopyPreviewLoading
 } from '../../features/timesheets/timesheetSlice'
 import { fetchProjects, selectActiveProjects } from '../../features/projects/projectSlice'
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
-import { StatusBadge, LoadingSpinner, ConfirmDialog, FieldError } from '../../components/ui'
+import { StatusBadge, LoadingSpinner, ConfirmDialog, FieldError, PageTransition } from '../../components/ui'
 import { format, parseISO, isAfter, startOfDay } from 'date-fns'
+import { Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']
 const PROJECT_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
+const DAILY_OT_ALERT_H  = 2.0
+const WEEKLY_OT_ALERT_H = 10.0
+const fmtOt = (h) => parseFloat(h.toFixed(1))
 
 function isFutureDay(weekStartDate, dayName) {
   if (!weekStartDate) return false
@@ -400,6 +406,145 @@ function EntryDrawer({
   )
 }
 
+// ─── Copy preview modal ────────────────────────────────────────────────────────
+function formatSkipReason(entry) {
+  switch (entry.reason) {
+    case 'HOLIDAY_DAY':        return 'Day is a company holiday'
+    case 'LEAVE_DAY':          return 'Day is on approved leave'
+    case 'PROJECT_NOT_ACTIVE': return 'Project is no longer active'
+    case 'PROJECT_COMPLETED':  return 'Project is no longer active'
+    case 'DUPLICATE_ENTRY':    return 'Entry already exists'
+    case 'OVERLAP_STRICT':     return 'Overlaps an existing entry'
+    default:                   return entry.reason
+  }
+}
+
+function CopyPreviewModal({ preview, sourceWeekLabel, copyLoading, onConfirm, onCancel }) {
+  const pendingEntries = preview?.pendingEntries ?? []
+  const skippedEntries = preview?.skippedEntries ?? []
+  const nothingToCopy  = pendingEntries.length === 0
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onCancel])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="copy-preview-title">
+      <div className="absolute inset-0" onClick={onCancel} />
+      <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col z-10 animate-scale-in">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border flex-shrink-0">
+          <div>
+            <h3 id="copy-preview-title" className="text-base font-semibold text-foreground">Copy from week of {sourceWeekLabel}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {nothingToCopy
+                ? 'Nothing to copy — all entries are blocked'
+                : `${pendingEntries.length} ${pendingEntries.length === 1 ? 'entry' : 'entries'} will be copied${skippedEntries.length > 0 ? ` · ${skippedEntries.length} skipped` : ''}`
+              }
+            </p>
+          </div>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors ml-4 flex-shrink-0" aria-label="Close">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-5 py-4 space-y-4 flex-1">
+          {/* Will be copied */}
+          {pendingEntries.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Will be copied ({pendingEntries.length})</p>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="text-emerald-700 border-b border-emerald-200">
+                      <th className="px-3 py-1.5 text-left font-semibold">Day</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Project</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingEntries.map((entry, i) => (
+                      <tr key={i} className="border-b border-emerald-100 last:border-0">
+                        <td className="px-3 py-1.5 capitalize text-emerald-900">{entry.day?.toLowerCase()}</td>
+                        <td className="px-3 py-1.5 text-emerald-900">{entry.projectName || entry.projectId}</td>
+                        <td className="px-3 py-1.5 tabular-nums text-emerald-900">{entry.startTime?.substring(0,5)}–{entry.endTime?.substring(0,5)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Will be skipped */}
+          {skippedEntries.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">Will be skipped ({skippedEntries.length})</p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="text-amber-700 border-b border-amber-200">
+                      <th className="px-3 py-1.5 text-left font-semibold">Day</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Project</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Time</th>
+                      <th className="px-3 py-1.5 text-left font-semibold">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skippedEntries.map((entry, i) => (
+                      <tr key={i} className="border-b border-amber-100 last:border-0">
+                        <td className="px-3 py-1.5 capitalize text-amber-900">{entry.day?.toLowerCase()}</td>
+                        <td className="px-3 py-1.5 text-amber-900">{entry.projectName || entry.projectId}</td>
+                        <td className="px-3 py-1.5 tabular-nums text-amber-900">{entry.startTime?.substring(0,5)}–{entry.endTime?.substring(0,5)}</td>
+                        <td className="px-3 py-1.5 text-amber-800">
+                          {formatSkipReason(entry)}
+                          {entry.reason === 'OVERLAP_STRICT' && entry.conflictingRange && (
+                            <span className="block text-[10px] tabular-nums text-amber-600 mt-0.5">({entry.conflictingRange})</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Nothing at all */}
+          {nothingToCopy && skippedEntries.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">No entries found in last week's timesheet.</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-5 py-4 border-t border-border flex-shrink-0">
+          <button className="btn-secondary flex-1 h-9 text-sm" onClick={onCancel} disabled={copyLoading}>Cancel</button>
+          <button
+            className="btn-primary flex-1 h-9 text-sm disabled:opacity-50"
+            onClick={onConfirm}
+            disabled={nothingToCopy || copyLoading}
+          >
+            {copyLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Copying…
+              </span>
+            ) : `Copy ${pendingEntries.length} ${pendingEntries.length === 1 ? 'entry' : 'entries'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function TimesheetDetail() {
   const { id }         = useParams()
@@ -412,6 +557,14 @@ export default function TimesheetDetail() {
   const error          = useSelector(selectTimesheetError)
   const projects       = useSelector(selectActiveProjects)
   const currentUser    = useSelector(selectCurrentUser)
+  const copySummary         = useSelector(selectCopySummary)
+  const copyLoading         = useSelector(selectCopyLoading)
+  const copyPreview         = useSelector(selectCopyPreview)
+  const copyPreviewLoading  = useSelector(selectCopyPreviewLoading)
+
+  // Per-day overtime comment state
+  const [commentDrafts, setCommentDrafts] = useState({})
+  const [savingDay,     setSavingDay]     = useState(null)
 
   const [drawerOpen,  setDrawerOpen]  = useState(false)
   const [editEntry,   setEditEntry]   = useState(null)
@@ -436,6 +589,15 @@ export default function TimesheetDetail() {
     dispatch(fetchTimesheetById(id))
     dispatch(fetchProjects({ status: 'ACTIVE', departmentId: currentUser?.departmentId }))
   }, [id, dispatch, currentUser?.departmentId])
+
+  // Initialise comment drafts once per timesheet — NOT on every currentTimesheet update
+  // to avoid overwriting unsaved text when a sibling day's save refreshes the store
+  useEffect(() => {
+    if (!timesheet?.days) return
+    const initial = {}
+    timesheet.days.forEach(d => { initial[d.day] = d.overtimeComment ?? '' })
+    setCommentDrafts(initial)
+  }, [timesheet?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (error) { toast.error(error); dispatch(clearError()) }
@@ -538,35 +700,82 @@ export default function TimesheetDetail() {
 
   const doSubmit = async () => {
     setSubmitLoading(true)
+    const tid = toast.loading('Submitting timesheet…')
     try {
       await dispatch(submitTimesheet(id)).unwrap()
-      toast.success('Timesheet submitted successfully!')
+      toast.success('Timesheet submitted successfully!', { id: tid })
       setConfirmSubmit(false)
     } catch (err) {
-      toast.error(err || 'Failed to submit')
+      toast.error(err || 'Failed to submit', { id: tid })
     } finally {
       setSubmitLoading(false)
+    }
+  }
+
+  const handleCopyClick = async () => {
+    try {
+      const result = await dispatch(previewCopyLastWeek(id)).unwrap()
+      const summary = result?.copySummary
+      // Edge-case messages that don't need a modal (no source timesheet, no entries)
+      if (summary?.message) {
+        toast.success(summary.message)
+      }
+      // Modal opens automatically via copyPreview selector being set
+    } catch (err) {
+      toast.error(err || 'Failed to load preview')
+    }
+  }
+
+  const doCopyLastWeek = async () => {
+    dispatch(clearCopyPreview()) // close modal immediately
+    try {
+      const result = await dispatch(copyLastWeek(id)).unwrap()
+      const summary = result?.copySummary
+      if ((summary?.copiedCount ?? 0) > 0) {
+        toast.success(
+          `Copied ${summary.copiedCount} ${summary.copiedCount === 1 ? 'entry' : 'entries'} from the week of ${sourceWeekLabel}`
+        )
+      } else if ((summary?.skippedCount ?? 0) > 0) {
+        toast.success(`0 entries copied — ${summary.skippedCount} ${summary.skippedCount === 1 ? 'entry' : 'entries'} skipped`)
+      } else {
+        toast.success('Nothing new to add — all entries were already present or blocked')
+      }
+      // Skipped entries were already shown in the preview modal — suppress the amber panel
+      dispatch(clearCopySummary())
+    } catch (err) {
+      toast.error(err || 'Failed to copy from last week')
     }
   }
 
   if (loading || !timesheet) return <Layout><LoadingSpinner /></Layout>
 
   // Locked = non-editable by the employee (submitted or approved)
-  const isLocked   = timesheet?.status === 'SUBMITTED' || timesheet?.status === 'APPROVED'
-  const canSubmit  = timesheet?.status === 'DRAFT'     || timesheet?.status === 'REJECTED'
+  const isLocked       = timesheet?.status === 'SUBMITTED' || timesheet?.status === 'APPROVED'
+  const isOwnTimesheet = timesheet?.employeeId === currentUser?.id
+  const canSubmit      = (timesheet?.status === 'DRAFT' || timesheet?.status === 'REJECTED') && isOwnTimesheet
+  const canCopyLastWeek = (timesheet?.status === 'DRAFT' || timesheet?.status === 'REJECTED') && isOwnTimesheet
+  const canEditComment  = isOwnTimesheet && (timesheet?.status === 'DRAFT' || timesheet?.status === 'REJECTED')
   const canApproveOrReject =
     (currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') &&
     timesheet?.status === 'SUBMITTED' &&
     timesheet?.employeeId !== currentUser?.id
 
+  const sourceWeekStart = timesheet?.weekStartDate
+    ? new Date(parseISO(timesheet.weekStartDate).getTime() - 7 * 86400000)
+    : null
+  const sourceWeekLabel = sourceWeekStart
+    ? `${format(sourceWeekStart, 'MMM d')} – ${format(new Date(sourceWeekStart.getTime() + 4 * 86400000), 'MMM d')}`
+    : 'last week'
+
   const doApprove = async () => {
     setActionLoading(true)
+    const tid = toast.loading('Approving…')
     try {
       await dispatch(approveTimesheet(id)).unwrap()
-      toast.success('Timesheet approved!')
-      setConfirmApprove(false)
+      toast.success('Timesheet approved', { id: tid })
+      navigate(-1)
     } catch (err) {
-      toast.error(err || 'Failed to approve timesheet')
+      toast.error(err || 'Failed to approve timesheet', { id: tid })
     } finally {
       setActionLoading(false)
     }
@@ -574,24 +783,26 @@ export default function TimesheetDetail() {
 
   const doReject = async () => {
     setActionLoading(true)
+    const tid = toast.loading('Rejecting…')
     try {
-      await dispatch(rejectTimesheet({ id, reason: rejectReason || undefined })).unwrap()
-      toast.success('Timesheet rejected')
-      setConfirmReject(false)
-      setRejectReason('')
+      await dispatch(rejectTimesheet({ id, reason: rejectReason })).unwrap()
+      toast.success('Timesheet rejected', { id: tid })
+      navigate(-1)
     } catch (err) {
-      toast.error(err || 'Failed to reject timesheet')
+      toast.error(err || 'Failed to reject timesheet', { id: tid })
     } finally {
       setActionLoading(false)
     }
   }
 
-  const totalHoursWeek = Number(timesheet.totalHours || 0)
+  const totalHoursWeek    = Number(timesheet.totalHours || 0)
+  const totalOvertimeWeek = Number(timesheet.totalOvertimeHours || 0)
   const weekPct   = Math.min(100, (totalHoursWeek / 40) * 100)
   const weekColor = weekPct >= 100 ? '#10B981' : weekPct >= 60 ? '#6366F1' : '#F59E0B'
 
   return (
     <Layout>
+      <PageTransition>
       {/* ── Page header ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-1">
         <button
@@ -612,12 +823,33 @@ export default function TimesheetDetail() {
           </h1>
           <StatusBadge status={timesheet.status} />
         </div>
-        {/* Submit button — visible when DRAFT or REJECTED */}
-        {canSubmit && (
-          <button className="btn-primary flex-shrink-0 h-8 px-4 text-sm" onClick={handleSubmit}>
-            Submit
-          </button>
-        )}
+        {/* Action buttons — Submit and Copy grouped together */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {canCopyLastWeek && (
+            <button
+              className="btn-secondary h-8 px-3 text-sm flex items-center gap-1.5 disabled:opacity-50"
+              onClick={handleCopyClick}
+              disabled={copyLoading || copyPreviewLoading}
+            >
+              {(copyLoading || copyPreviewLoading) ? (
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              )}
+              Copy Last Week
+            </button>
+          )}
+          {canSubmit && (
+            <button className="btn-primary h-8 px-4 text-sm" onClick={handleSubmit}>
+              Submit
+            </button>
+          )}
+        </div>
         {/* Approve / Reject buttons — visible to MANAGER/ADMIN when SUBMITTED */}
         {canApproveOrReject && (
           <div className="flex gap-2 flex-shrink-0">
@@ -645,22 +877,114 @@ export default function TimesheetDetail() {
       )}
 
       {/* Week progress bar */}
-      <div className="flex items-center gap-2 mb-6 max-w-sm">
+      <div className="flex items-center gap-2 mb-4 max-w-sm">
         <div className="flex-1 h-1 bg-muted/60 rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${weekPct}%`, background: weekColor }} />
         </div>
         <span className="text-xs tabular-nums font-medium flex-shrink-0" style={{ color: weekColor }}>
           {totalHoursWeek.toFixed(1)}<span className="text-muted-foreground font-normal">/40h</span>
         </span>
+        {totalOvertimeWeek > 0 && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
+            <Zap className="w-2.5 h-2.5 flex-shrink-0" />
+            Overtime
+            <span className="font-bold tabular-nums">{totalOvertimeWeek.toFixed(1)}h</span>
+          </span>
+        )}
       </div>
+
+      {/* Weekly overtime threshold alert */}
+      {totalOvertimeWeek > WEEKLY_OT_ALERT_H && (
+        <p className="text-[11px] text-amber-700 mb-3 -mt-2">
+          {isOwnTimesheet
+            ? `You've logged ${fmtOt(totalOvertimeWeek)}h of overtime this week.`
+            : `${timesheet.employeeName} has logged ${fmtOt(totalOvertimeWeek)}h of overtime this week.`
+          }
+        </p>
+      )}
+
+      {/* Copy Last Week — preview modal */}
+      {copyPreview !== null && copyPreview.message == null && (
+        <CopyPreviewModal
+          preview={copyPreview}
+          sourceWeekLabel={sourceWeekLabel}
+          copyLoading={copyLoading}
+          onConfirm={doCopyLastWeek}
+          onCancel={() => dispatch(clearCopyPreview())}
+        />
+      )}
+
+      {/* Copy Last Week — skipped entries panel */}
+      {copySummary !== null && copySummary.skippedCount > 0 && (() => {
+        return (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <p className="text-xs font-semibold text-amber-800">
+                {copySummary.copiedCount > 0
+                  ? `${copySummary.copiedCount} ${copySummary.copiedCount === 1 ? 'entry' : 'entries'} copied`
+                  : 'Nothing new copied'
+                }
+                {' · '}{copySummary.skippedCount} {copySummary.skippedCount === 1 ? 'entry' : 'entries'} skipped
+                {' — from week of '}{sourceWeekLabel}
+              </p>
+              <button
+                onClick={() => dispatch(clearCopySummary())}
+                className="flex-shrink-0 text-amber-500 hover:text-amber-700 transition-colors"
+                aria-label="Dismiss"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-amber-700 border-b border-amber-200">
+                    <th className="pb-1 text-left font-semibold">Day</th>
+                    <th className="pb-1 text-left font-semibold">Project</th>
+                    <th className="pb-1 text-left font-semibold">Time</th>
+                    <th className="pb-1 text-left font-semibold">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {copySummary.skippedEntries.map((entry, i) => (
+                    <tr key={i} className="border-b border-amber-100 last:border-0">
+                      <td className="py-1 pr-3 capitalize text-amber-900">{entry.day?.toLowerCase()}</td>
+                      <td className="py-1 pr-3 text-amber-900">{entry.projectName || entry.projectId}</td>
+                      <td className="py-1 pr-3 tabular-nums text-amber-900">{entry.startTime?.substring(0,5)}–{entry.endTime?.substring(0,5)}</td>
+                      <td className="py-1 text-amber-800">
+                        {entry.reason === 'HOLIDAY_DAY'        ? 'Day is a company holiday' :
+                         entry.reason === 'LEAVE_DAY'          ? 'Day is on approved leave' :
+                         entry.reason === 'PROJECT_NOT_ACTIVE' ? 'Project is no longer active' :
+                         entry.reason === 'PROJECT_COMPLETED'  ? 'Project is no longer active' :
+                         entry.reason === 'DUPLICATE_ENTRY'    ? 'Entry already exists' :
+                         entry.reason === 'OVERLAP_STRICT'     ? 'Overlaps an existing entry' :
+                         entry.reason === 'FUTURE_DAY'         ? 'Future date — not yet reached' :
+                         entry.reason}
+                        {entry.reason === 'OVERLAP_STRICT' && entry.conflictingRange && (
+                          <span className="block text-[10px] tabular-nums text-amber-600 mt-0.5">
+                            ({entry.conflictingRange})
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Day rows ────────────────────────────────────────────────── */}
       <div className="divide-y divide-border/50">
         {DAYS.map((day) => {
-          const dayData    = getDayData(day)
-          const entries    = dayData?.entries || []
-          const totalHours = Number(dayData?.totalHours || 0)
-          const dayStatus  = dayData?.dayStatus || 'WORK'
+          const dayData     = getDayData(day)
+          const entries     = dayData?.entries || []
+          const totalHours  = Number(dayData?.totalHours || 0)
+          const overtimeHours = Number(dayData?.overtimeHours || 0)
+          const dayStatus   = dayData?.dayStatus || 'WORK'
           const leaveType  = dayData?.leaveType
           const editable   = isEditable(day)
           const dayLabel   = day.charAt(0) + day.slice(1).toLowerCase()
@@ -720,12 +1044,74 @@ export default function TimesheetDetail() {
                       }`}>
                         {totalHours >= 8 ? 'Complete' : 'Incomplete'}
                       </span>
+                      {overtimeHours > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                          <Zap className="w-2.5 h-2.5 flex-shrink-0" />
+                          Overtime
+                          <span className="font-bold tabular-nums">{overtimeHours.toFixed(1)}h</span>
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="text-[11px] text-muted-foreground/50">{editable ? 'No entries yet' : 'No entries'}</span>
                   )}
                 </div>
               </div>
+
+              {/* Daily overtime threshold alert */}
+              {overtimeHours > DAILY_OT_ALERT_H && (
+                <p className="ml-36 text-[11px] text-amber-700 mt-0.5 mb-1">
+                  {isOwnTimesheet
+                    ? `You've logged ${fmtOt(overtimeHours)}h of overtime today.`
+                    : `${timesheet.employeeName} logged ${fmtOt(overtimeHours)}h of overtime today.`
+                  }
+                </p>
+              )}
+
+              {/* Overtime comment */}
+              {overtimeHours > 0 && (() => {
+                const draft = commentDrafts[day] ?? ''
+                const saved = dayData?.overtimeComment ?? ''
+                const unchanged = draft === saved
+                return (
+                  <div className="ml-36 mt-1.5 mb-1">
+                    {canEditComment ? (
+                      <div className="space-y-1">
+                        <textarea
+                          className="w-full text-[11px] text-muted-foreground bg-muted/30 border border-border/50 rounded-md px-2.5 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/40"
+                          rows={2}
+                          maxLength={500}
+                          placeholder="Optional: add context for overtime (e.g., client deadline)"
+                          value={draft}
+                          onChange={e => setCommentDrafts(prev => ({ ...prev, [day]: e.target.value }))}
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground/50">{draft.length}/500</span>
+                          <button
+                            className="text-[11px] px-2.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40"
+                            disabled={unchanged || savingDay === day}
+                            onClick={async () => {
+                              setSavingDay(day)
+                              try {
+                                await dispatch(saveOvertimeComment({ timesheetId: id, day, comment: draft })).unwrap()
+                                toast.success('Comment saved')
+                              } catch (err) {
+                                toast.error(err || 'Failed to save comment')
+                              } finally {
+                                setSavingDay(null)
+                              }
+                            }}
+                          >
+                            {savingDay === day ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      saved && <p className="text-[11px] text-muted-foreground italic">{saved}</p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {hasWork && (
                 <div className="ml-36 mr-14 mb-2">
@@ -828,8 +1214,8 @@ export default function TimesheetDetail() {
 
       {/* ── Reject dialog with reason input ──────────────────────────── */}
       {confirmReject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px]">
-          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-fade-in">
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-scale-in">
             <h3 className="text-base font-semibold text-foreground">Reject this timesheet?</h3>
             <p className="text-sm text-muted-foreground">
               Provide a reason so the employee knows what to correct before resubmitting.
@@ -865,6 +1251,7 @@ export default function TimesheetDetail() {
           </div>
         </div>
       )}
+      </PageTransition>
     </Layout>
   )
 }
