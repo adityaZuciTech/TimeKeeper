@@ -4,7 +4,12 @@ import { Provider } from 'react-redux'
 import { Toaster } from 'react-hot-toast'
 import App from './App.jsx'
 import { store } from './app/store.js'
+import { injectStore } from './services/apiClient.js'
 import './index.css'
+
+// Break apiClient ↔ store circular dependency by injecting the store
+// after it has been fully initialized.
+injectStore(store)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -11,5 +11,11 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    setupFiles: ['./src/test/setup.js'],
+    exclude: ['tests/e2e/**', 'node_modules/**'],
+  },
 })

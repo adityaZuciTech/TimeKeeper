@@ -77,6 +77,12 @@ const navGroups = {
       ],
     },
     {
+      section: 'INSIGHTS',
+      items: [
+        { path: '/reports', label: 'Project Effort', Icon: BarChart2 },
+      ],
+    },
+    {
       section: 'ACCOUNT',
       items: [
         { path: '/profile', label: 'Profile', Icon: User },
@@ -117,7 +123,7 @@ const navGroups = {
     {
       section: 'INSIGHTS',
       items: [
-        { path: '/organization', label: 'Reports', Icon: BarChart2 },
+        { path: '/organization', label: 'Organization Overview', Icon: Building2 },
       ],
     },
     {

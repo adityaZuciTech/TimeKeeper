@@ -249,7 +249,6 @@ function EmployeeDrawer({ emp, employees, onClose, onEdit, onToggleStatus, isAdm
                           <span className="font-medium text-foreground tabular-nums">{Number(ts.totalHours || 0).toFixed(0)}h</span>
                           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium
                             ${ts.status === 'SUBMITTED'      ? 'bg-emerald-100 text-emerald-700'
-                            : ts.status === 'AUTO_SUBMITTED' ? 'bg-emerald-100 text-emerald-600'
                             : ts.status === 'DRAFT'          ? 'bg-amber-100  text-amber-700'
                             :                                  'bg-muted text-muted-foreground'}`}>
                             {ts.status?.replace('_', ' ')}

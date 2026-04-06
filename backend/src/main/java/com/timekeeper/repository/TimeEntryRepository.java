@@ -78,4 +78,116 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, String> {
             """)
     List<Object[]> sumHoursByTeamMemberForWeek(@Param("managerId") String managerId,
                                                 @Param("weekStart") LocalDate weekStart);
+
+    /**
+     * Returns [projectId, SUM(hoursLogged), COUNT(DISTINCT employeeId)] per project for a given week.
+     * Used by Project Effort List report (ADMIN scope).
+     */
+    @Query("""
+            SELECT te.project.id,
+                   COALESCE(SUM(te.hoursLogged), 0),
+                   COUNT(DISTINCT t.employee.id)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            WHERE t.weekStartDate = :weekStart
+              AND te.entryType = 'WORK'
+              AND te.project IS NOT NULL
+            GROUP BY te.project.id
+            """)
+    List<Object[]> sumHoursByProjectForWeek(@Param("weekStart") LocalDate weekStart);
+
+    /**
+     * Manager-scoped variant — only includes contributions from the manager's direct reports.
+     */
+    @Query("""
+            SELECT te.project.id,
+                   COALESCE(SUM(te.hoursLogged), 0),
+                   COUNT(DISTINCT t.employee.id)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            JOIN t.employee e
+            WHERE t.weekStartDate = :weekStart
+              AND te.entryType = 'WORK'
+              AND te.project IS NOT NULL
+              AND e.managerId = :managerId
+            GROUP BY te.project.id
+            """)
+    List<Object[]> sumHoursByProjectForWeekAndManager(@Param("managerId") String managerId,
+                                                       @Param("weekStart") LocalDate weekStart);
+
+    /**
+     * Returns [employeeId, employeeName, SUM(hoursLogged)] per contributor for a project in a specific week.
+     * Used by Project Detail report (ADMIN scope).
+     */
+    @Query("""
+            SELECT e.id, e.name, COALESCE(SUM(te.hoursLogged), 0)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            JOIN t.employee e
+            WHERE te.project.id = :projectId
+              AND t.weekStartDate = :weekStart
+              AND te.entryType = 'WORK'
+            GROUP BY e.id, e.name
+            """)
+    List<Object[]> sumHoursByEmployeeForProjectAndWeek(@Param("projectId") String projectId,
+                                                        @Param("weekStart") LocalDate weekStart);
+
+    /**
+     * Manager-scoped variant of sumHoursByEmployeeForProjectAndWeek.
+     */
+    @Query("""
+            SELECT e.id, e.name, COALESCE(SUM(te.hoursLogged), 0)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            JOIN t.employee e
+            WHERE te.project.id = :projectId
+              AND t.weekStartDate = :weekStart
+              AND te.entryType = 'WORK'
+              AND e.managerId = :managerId
+            GROUP BY e.id, e.name
+            """)
+    List<Object[]> sumHoursByEmployeeForProjectAndWeekAndManager(@Param("projectId") String projectId,
+                                                                   @Param("managerId") String managerId,
+                                                                   @Param("weekStart") LocalDate weekStart);
+
+    /**
+     * Returns [weekStartDate, SUM(hoursLogged)] per week for a project within a date range.
+     * Used for 6-week trend in Project Detail (ADMIN scope).
+     * Missing weeks are not returned — fill with zero in the service layer.
+     */
+    @Query("""
+            SELECT t.weekStartDate, COALESCE(SUM(te.hoursLogged), 0)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            WHERE te.project.id = :projectId
+              AND te.entryType = 'WORK'
+              AND t.weekStartDate >= :rangeStart
+              AND t.weekStartDate <= :rangeEnd
+            GROUP BY t.weekStartDate
+            ORDER BY t.weekStartDate ASC
+            """)
+    List<Object[]> sumWeeklyHoursByProjectInRange(@Param("projectId") String projectId,
+                                                   @Param("rangeStart") LocalDate rangeStart,
+                                                   @Param("rangeEnd") LocalDate rangeEnd);
+
+    /**
+     * Manager-scoped variant of sumWeeklyHoursByProjectInRange.
+     */
+    @Query("""
+            SELECT t.weekStartDate, COALESCE(SUM(te.hoursLogged), 0)
+            FROM TimeEntry te
+            JOIN te.timesheet t
+            JOIN t.employee e
+            WHERE te.project.id = :projectId
+              AND te.entryType = 'WORK'
+              AND t.weekStartDate >= :rangeStart
+              AND t.weekStartDate <= :rangeEnd
+              AND e.managerId = :managerId
+            GROUP BY t.weekStartDate
+            ORDER BY t.weekStartDate ASC
+            """)
+    List<Object[]> sumWeeklyHoursByProjectInRangeAndManager(@Param("projectId") String projectId,
+                                                              @Param("managerId") String managerId,
+                                                              @Param("rangeStart") LocalDate rangeStart,
+                                                              @Param("rangeEnd") LocalDate rangeEnd);
 }

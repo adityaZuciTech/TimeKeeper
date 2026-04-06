@@ -54,6 +54,36 @@ export const markSectionRead = createAsyncThunk(
   }
 )
 
+// Optimistic dismiss — pending case removes from state immediately;
+// on failure the thunk re-fetches from server to restore accurate state.
+export const dismissNotification = createAsyncThunk(
+  'notifications/dismiss',
+  async (id, { dispatch, rejectWithValue }) => {
+    try {
+      await notificationService.deleteOne(id)
+      return id
+    } catch (err) {
+      dispatch(fetchNotifications()) // rollback via refetch
+      return rejectWithValue(err.response?.data?.message || 'Failed to dismiss')
+    }
+  }
+)
+
+// Called only after the undo window expires — the UI has already been cleared
+// optimistically via restoreNotifications([]) in the component.
+export const clearAllNotifications = createAsyncThunk(
+  'notifications/clearAll',
+  async (_, { dispatch, rejectWithValue }) => {
+    try {
+      await notificationService.clearAll()
+      return true
+    } catch (err) {
+      dispatch(fetchNotifications()) // rollback via refetch
+      return rejectWithValue(err.response?.data?.message || 'Failed to clear notifications')
+    }
+  }
+)
+
 function computeBadges(notifications) {
   return {
     timesheets:      notifications.filter((n) => !n.read && n.targetSection === 'TIMESHEET').length,
@@ -72,7 +102,14 @@ const notificationSlice = createSlice({
     badges: { timesheets: 0, team_timesheets: 0, personal_leaves: 0, team_leaves: 0, team: 0 },
     loading: false,
   },
-  reducers: {},
+  reducers: {
+    // Synchronous restore used by: Undo (restores snapshot) and clear-all optimistic UI
+    restoreNotifications: (state, action) => {
+      state.notifications = action.payload
+      state.unreadCount   = action.payload.filter((n) => !n.read).length
+      state.badges        = computeBadges(action.payload)
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchNotifications.pending, (state) => {
@@ -109,12 +146,22 @@ const notificationSlice = createSlice({
         state.unreadCount = state.notifications.filter((n) => !n.read).length
         state.badges = computeBadges(state.notifications)
       })
+      // Optimistic remove: fired before the API call completes
+      .addCase(dismissNotification.pending, (state, action) => {
+        const id = action.meta.arg
+        const item = state.notifications.find((n) => n.id === id)
+        if (!item) return
+        state.notifications = state.notifications.filter((n) => n.id !== id)
+        if (!item.read) state.unreadCount = Math.max(0, state.unreadCount - 1)
+        state.badges = computeBadges(state.notifications)
+      })
   },
 })
 
+export const { restoreNotifications } = notificationSlice.actions
 export default notificationSlice.reducer
 
-export const selectNotifications = (state) => state.notifications.notifications
-export const selectUnreadCount = (state) => state.notifications.unreadCount
-export const selectBadges = (state) => state.notifications.badges
+export const selectNotifications        = (state) => state.notifications.notifications
+export const selectUnreadCount          = (state) => state.notifications.unreadCount
+export const selectBadges               = (state) => state.notifications.badges
 export const selectNotificationsLoading = (state) => state.notifications.loading

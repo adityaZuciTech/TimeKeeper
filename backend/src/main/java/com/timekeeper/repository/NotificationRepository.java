@@ -22,4 +22,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     void markAllAsReadByUserIdAndSection(@Param("userId") String userId, @Param("section") Notification.NotificationSection section);
 
     long countByUserIdAndReadFalseAndTargetSection(String userId, Notification.NotificationSection targetSection);
+
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.userId = :userId")
+    void deleteAllByUserId(@Param("userId") String userId);
 }

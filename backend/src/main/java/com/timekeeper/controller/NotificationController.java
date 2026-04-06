@@ -54,4 +54,21 @@ public class NotificationController {
         notificationService.markSectionAsRead(currentUser.getId(), section);
         return ResponseEntity.ok(ApiResponse.success("Section notifications marked as read", null));
     }
+
+    @Operation(summary = "Delete a single notification")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteNotification(
+            @PathVariable String id,
+            @AuthenticationPrincipal Employee currentUser) {
+        notificationService.deleteNotification(id, currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Notification deleted", null));
+    }
+
+    @Operation(summary = "Delete all notifications for the current user")
+    @DeleteMapping("/clear-all")
+    public ResponseEntity<ApiResponse<Void>> clearAllNotifications(
+            @AuthenticationPrincipal Employee currentUser) {
+        notificationService.clearAllNotifications(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("All notifications cleared", null));
+    }
 }

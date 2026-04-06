@@ -38,7 +38,7 @@ public class TimesheetResponse {
         private String dayStatus;   // WORK | LEAVE | HOLIDAY
         private String leaveType;   // SICK | CASUAL | VACATION (populated when dayStatus=LEAVE)
         private String leaveId;     // ID of the Leave record (populated when dayStatus=LEAVE)
-        private boolean editable;   // false when HOLIDAY, LEAVE, or timesheet is SUBMITTED
+        private boolean editable;   // false when HOLIDAY, LEAVE, or timesheet is SUBMITTED/APPROVED
         /** Optional employee comment for overtime context. Null when overtimeHours == 0. */
         private String overtimeComment;
         private List<TimeEntryResponse> entries;

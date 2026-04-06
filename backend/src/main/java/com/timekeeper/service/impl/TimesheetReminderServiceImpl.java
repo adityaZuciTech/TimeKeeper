@@ -36,7 +36,11 @@ public class TimesheetReminderServiceImpl implements TimesheetReminderService {
 
         for (Employee employee : employees) {
             log.info("Sending reminder to employee: {}", employee.getEmail());
-            emailService.sendTimesheetReminderEmail(employee, weekStart, weekEnd);
+            try {
+                emailService.sendTimesheetReminderEmail(employee, weekStart, weekEnd);
+            } catch (Exception e) {
+                log.warn("Failed to send reminder to {}: {}", employee.getEmail(), e.getMessage());
+            }
         }
 
         log.info("Weekly timesheet reminder job completed — {} reminder(s) sent", employees.size());

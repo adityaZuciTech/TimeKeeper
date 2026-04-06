@@ -28,7 +28,7 @@ export default function Dashboard() {
   useEffect(() => { dispatch(fetchMyTimesheets()) }, [dispatch])
 
   const stats = useMemo(() => {
-    const submitted  = timesheets.filter(t => t.status === 'SUBMITTED' || t.status === 'APPROVED' || t.status === 'AUTO_SUBMITTED').length
+    const submitted  = timesheets.filter(t => t.status === 'SUBMITTED' || t.status === 'APPROVED').length
     const drafts     = timesheets.filter(t => t.status === 'DRAFT').length
     const totalHours = timesheets.reduce((s, t) => s + Number(t.totalHours || 0), 0)
     const avgHours   = timesheets.length ? (totalHours / timesheets.length).toFixed(1) : '0.0'

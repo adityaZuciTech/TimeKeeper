@@ -18,8 +18,7 @@ export function PageTransition({ children, className = '' }) {
 //   Pending  ? amber   | Overdue   ? red
 const badgeConfig = {
   DRAFT:          { cls: 'badge-draft',         Icon: FileText,     label: 'Draft'          },
-  SUBMITTED:      { cls: 'badge-submitted',     Icon: CheckCircle2, label: 'Submitted'      },
-  AUTO_SUBMITTED: { cls: 'badge-auto-submitted', Icon: CheckCircle2, label: 'Submitted'     },
+  SUBMITTED:      { cls: 'badge-submitted',     Icon: CheckCircle2, label: 'Submitted'      },
   APPROVED:       { cls: 'badge-approved',      Icon: CheckCircle2, label: 'Approved'       },
   REJECTED:       { cls: 'badge-rejected',      Icon: XCircle,      label: 'Rejected'       },
   OVERDUE:        { cls: 'badge-overdue',        Icon: AlertTriangle,label: 'Overdue'        },

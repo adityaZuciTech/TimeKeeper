@@ -1,19 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { authService } from '../../services/authService'
-
-// Decode JWT and check expiry without verifying signature (server validates on every request)
-function isTokenExpired(token) {
-  try {
-    // JWT payload is the second segment, base64url-encoded
-    const base64Payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const payload = JSON.parse(atob(base64Payload))
-    if (!payload.exp) return true
-    // Add 10-second clock skew buffer
-    return payload.exp * 1000 < Date.now() - 10_000
-  } catch {
-    return true // malformed token → treat as expired
-  }
-}
+import { resetAllState } from '../../app/actions'
+import { isTokenExpired } from './tokenUtils'
 
 // Load persisted auth from localStorage — only trust token if it hasn't expired
 const storedToken = localStorage.getItem('tk_token')
@@ -39,13 +27,15 @@ export const login = createAsyncThunk('auth/login', async (credentials, { reject
   }
 })
 
-export const logoutAsync = createAsyncThunk('auth/logout', async (_, { getState }) => {
+export const logoutAsync = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
   try {
     // Revoke the JWT on the server so it becomes immediately invalid
     await authService.logout()
   } catch {
     // Ignore errors — local state is always cleared regardless
   }
+  // Clear all Redux slices so stale data never leaks to the next session
+  dispatch(resetAllState())
 })
 
 export const changePassword = createAsyncThunk('auth/changePassword', async (data, { rejectWithValue }) => {

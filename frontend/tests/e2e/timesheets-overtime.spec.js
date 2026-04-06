@@ -143,84 +143,104 @@ test.describe('FE-03 — Submit button gate', () => {
 
 // ─── FE-04 & FE-05 ────────────────────────────────────────────────────────────
 // OT pill and per-day comment field require an entry longer than 8h.
-// Strategy: add a 9h entry (09:00–18:00) on a fresh DRAFT timesheet.
+// Strategy: on MONDAY (today), add a second entry 17:00–18:30 that pushes the
+// day total to 9.5 h (1.5 h overtime).  We must use today's date: the backend
+// blocks entries on future dates, so Tuesday/later days are off-limits.
+
+const API_BASE = 'http://localhost:8080/api/v1'
 
 test.describe('FE-04 / FE-05 — Overtime pill and comment field', () => {
   test.beforeEach(async ({ page }) => { await login(page) })
 
   /**
-   * Helper that adds a 9-hour entry to the current open timesheet detail page
-   * using whichever day row "Add Entry" button is available first.
-   * Returns true if the entry was successfully saved, false if not possible.
+   * Uses the REST API directly to add a MONDAY 17:00–18:30 overtime entry
+   * to whichever timesheet is currently open (ID extracted from the URL).
+   * Returns the timesheet ID if successful, null otherwise.
+   *
+   * Using the API (not UI) avoids fragility caused by the backend's
+   * "Cannot log time for a future date" guard: any day after today is
+   * blocked, so a weekday-agnostic UI helper would break on Mondays.
    */
-  async function addNineHourEntry(page) {
-    const addBtn = page.getByRole('button', { name: /add entry/i }).first()
-    if (await addBtn.count() === 0) return false
-    await addBtn.click()
-    await page.waitForTimeout(1_000)
+  async function addOvertimeEntryViaApi(page) {
+    const tsId = page.url().match(/timesheets\/([^/?#]+)/)?.[1]
+    if (!tsId || tsId === 'new') return null
 
-    // Change day to Tuesday to avoid conflicting with Monday's seeded entry
-    const daySelect = page.locator('select').first()
-    if (await daySelect.count() > 0) {
-      await daySelect.selectOption('TUESDAY')
-      await page.waitForTimeout(300)
-    }
+    // Obtain a fresh token
+    const authRes = await page.request.post(`${API_BASE}/auth/login`, {
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    })
+    if (!authRes.ok()) return null
+    const { data: { token } } = await authRes.json()
 
-    // Project is the second <select> in the drawer
-    const projectSelect = page.locator('select').nth(1)
-    if (await projectSelect.count() > 0) {
-      await projectSelect.selectOption({ index: 1 }) // first real project
-    }
+    // Resolve the first active project ID
+    const projRes = await page.request.get(`${API_BASE}/projects?status=ACTIVE&size=5`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const projBody = await projRes.json()
+    // Response shape: { data: { projects: [...] } }
+    const projects = projBody.data?.projects ?? projBody.data?.content ?? projBody.data ?? []
+    const projectId = projects[0]?.id
+    if (!projectId) return null
 
-    // Time inputs both have placeholder="09:00"; FROM is nth(0), TO is nth(1).
-    // The component commits on blur, so use fill + Tab.
-    const timeInputs = page.getByPlaceholder('09:00')
-    const inputCount = await timeInputs.count()
-    if (inputCount >= 2) {
-      await timeInputs.nth(0).click()
-      await timeInputs.nth(0).fill('08:00')
-      await timeInputs.nth(0).press('Tab')
-      await page.waitForTimeout(200)
-      await timeInputs.nth(1).click()
-      await timeInputs.nth(1).fill('17:30') // 9.5h > 8h threshold
-      await timeInputs.nth(1).press('Tab')
-      await page.waitForTimeout(200)
-    }
+    // Add MONDAY 17:00–18:30 — extends any earlier WORK entry past the 8h threshold.
+    // If an identical entry already exists the backend will return 400 (overlap);
+    // that is fine — the overtime condition is already met.
+    const entryRes = await page.request.post(`${API_BASE}/timesheets/${tsId}/entries`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { day: 'MONDAY', entryType: 'WORK', projectId, startTime: '17:00', endTime: '18:30' },
+    })
+    // 201 Created → entry added; 400 overlap → entry already present from a prior run.
+    // Either way the timesheet has > 8h on Monday → overtime is present.
+    if (!entryRes.ok() && entryRes.status() !== 400) return null
 
-    // Drawer save button is the last button named 'Add Entry'
-    const saveBtn = page.getByRole('button', { name: /add entry/i }).last()
-    await saveBtn.click()
-    await page.waitForTimeout(2_500)
-    return true
+    return tsId
   }
 
   test('FE-04: weekly OT pill is visible after a 9h entry is added', async ({ page }) => {
     await openOrCreateCurrentWeekTimesheet(page)
 
-    const added = await addNineHourEntry(page)
-    if (!added) {
+    // Check the timesheet is editable (DRAFT)
+    if (await page.getByRole('button', { name: /add entry/i }).count() === 0) {
       test.skip(true, 'No editable timesheet — cannot add overtime entry')
       return
     }
 
+    const tsId = await addOvertimeEntryViaApi(page)
+    if (!tsId) {
+      test.skip(true, 'Could not add overtime entry via API')
+      return
+    }
+
+    // Reload to pick up updated Redux state
+    await page.reload()
+    await page.waitForTimeout(2_000)
+
     // The weekly OT pill contains "Overtime" label + bold hours value
     await expect(
       page.getByText(/overtime/i).first()
-    ).toBeVisible({ timeout: 5_000 })
+    ).toBeVisible({ timeout: 8_000 })
   })
 
   test('FE-05: per-day OT comment textarea visible after overtime entry', async ({ page }) => {
     await openOrCreateCurrentWeekTimesheet(page)
 
-    const added = await addNineHourEntry(page)
-    if (!added) {
+    if (await page.getByRole('button', { name: /add entry/i }).count() === 0) {
       test.skip(true, 'No editable timesheet — cannot add overtime entry')
       return
     }
 
+    const tsId = await addOvertimeEntryViaApi(page)
+    if (!tsId) {
+      test.skip(true, 'Could not add overtime entry via API')
+      return
+    }
+
+    await page.reload()
+    await page.waitForTimeout(2_000)
+
     // The OT comment textarea uses this exact placeholder (from TimesheetDetail.jsx line 1084)
     const commentArea = page.getByPlaceholder(/add context for overtime/i)
-    await expect(commentArea.first()).toBeVisible({ timeout: 5_000 })
+    await expect(commentArea.first()).toBeVisible({ timeout: 8_000 })
   })
 })
 

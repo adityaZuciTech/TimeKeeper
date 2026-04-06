@@ -103,6 +103,21 @@ public class NotificationService {
         }
     }
 
+    @Transactional
+    public void deleteNotification(String notificationId, String userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found: " + notificationId));
+        if (!notification.getUserId().equals(userId)) {
+            throw new AccessDeniedException("Access denied");
+        }
+        notificationRepository.deleteById(notificationId);
+    }
+
+    @Transactional
+    public void clearAllNotifications(String userId) {
+        notificationRepository.deleteAllByUserId(userId);
+    }
+
     private NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId())

@@ -19,6 +19,8 @@ import Profile from './pages/Profile/Profile'
 import MyLeaves from './pages/Leaves/MyLeaves'
 import TeamLeaves from './pages/Leaves/TeamLeaves'
 import Holidays from './pages/Holidays/Holidays'
+import ProjectEffortList from './pages/Reports/ProjectEffortList'
+import ProjectDetail from './pages/Reports/ProjectDetail'
 import NotFound from './pages/NotFound'
 
 function RootRedirect() {
@@ -52,6 +54,8 @@ export default function App() {
           <Route path="/team" element={<Team />} />
           <Route path="/team/:employeeId/timesheets" element={<TeamMemberTimesheets />} />
           <Route path="/leaves/team" element={<TeamLeaves />} />
+          <Route path="/reports" element={<ProjectEffortList />} />
+          <Route path="/reports/project/:projectId" element={<ProjectDetail />} />
         </Route>
 
         {/* Admin only */}

@@ -12,8 +12,9 @@ import { fetchProjects, selectActiveProjects } from '../../features/projects/pro
 import { selectCurrentUser } from '../../features/auth/authSlice'
 import Layout from '../../components/Layout'
 import { StatusBadge, LoadingSpinner, ConfirmDialog, FieldError, PageTransition } from '../../components/ui'
-import { format, parseISO, isAfter, startOfDay } from 'date-fns'
-import { Zap } from 'lucide-react'
+import RejectionBanner from '../../components/RejectionBanner'
+import { format, parseISO } from 'date-fns'
+import { Zap, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']
@@ -22,13 +23,6 @@ const DAILY_OT_ALERT_H  = 2.0
 const WEEKLY_OT_ALERT_H = 10.0
 const fmtOt = (h) => parseFloat(h.toFixed(1))
 
-function isFutureDay(weekStartDate, dayName) {
-  if (!weekStartDate) return false
-  const dayIndex = DAYS.indexOf(dayName)
-  if (dayIndex === -1) return false
-  const dayDate = startOfDay(new Date(parseISO(weekStartDate).getTime() + dayIndex * 86400000))
-  return isAfter(dayDate, startOfDay(new Date()))
-}
 
 function toMinutes(timeStr) {
   if (!timeStr) return 0
@@ -565,6 +559,8 @@ export default function TimesheetDetail() {
   // Per-day overtime comment state
   const [commentDrafts, setCommentDrafts] = useState({})
   const [savingDay,     setSavingDay]     = useState(null)
+  // Overtime comment modal — opened after a manual entry add/edit causes overtime on a day
+  const [otModal, setOtModal] = useState({ open: false, day: null })
 
   const [drawerOpen,  setDrawerOpen]  = useState(false)
   const [editEntry,   setEditEntry]   = useState(null)
@@ -619,8 +615,6 @@ export default function TimesheetDetail() {
 
   const isEditable = (day) => {
     const dayData = getDayData(day)
-    // Never allow editing future days regardless of backend editable flag
-    if (isFutureDay(timesheet?.weekStartDate, day)) return false
     // Backend sets editable=false for locked timesheets (SUBMITTED / APPROVED)
     if (dayData && typeof dayData.editable === 'boolean') return dayData.editable
     // Fallback: not locked
@@ -666,14 +660,23 @@ export default function TimesheetDetail() {
       ...(formType === 'WORK' && { projectId: formProject, startTime: formStart, endTime: formEnd, description: formDesc }),
     }
     try {
+      let updatedTs
       if (editEntry) {
-        await dispatch(updateEntry({ timesheetId: id, entryId: editEntry.entryId, data: payload })).unwrap()
+        updatedTs = await dispatch(updateEntry({ timesheetId: id, entryId: editEntry.entryId, data: payload })).unwrap()
         toast.success('Entry updated')
       } else {
-        await dispatch(addEntry({ timesheetId: id, data: payload })).unwrap()
+        updatedTs = await dispatch(addEntry({ timesheetId: id, data: payload })).unwrap()
         toast.success('Entry added')
       }
       setDrawerOpen(false)
+      // Open overtime comment modal if this WORK entry created overtime on the day
+      if (formType === 'WORK' && canEditComment) {
+        const savedDay = updatedTs?.days?.find(d => d.day === formDay)
+        if (Number(savedDay?.overtimeHours || 0) > 0) {
+          setCommentDrafts(prev => ({ ...prev, [formDay]: savedDay.overtimeComment ?? '' }))
+          setOtModal({ open: true, day: formDay })
+        }
+      }
     } catch (err) {
       toast.error(err || 'Failed to save entry')
     }
@@ -869,11 +872,9 @@ export default function TimesheetDetail() {
         )}
       </div>
 
-      {/* Rejection reason banner */}
+      {/* Rejection reason banner — dismissible */}
       {timesheet.status === 'REJECTED' && timesheet.rejectionReason && (
-        <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-          <span className="font-semibold">Rejection reason:</span> {timesheet.rejectionReason}
-        </div>
+        <RejectionBanner timesheetId={timesheet.id} rejectionReason={timesheet.rejectionReason} />
       )}
 
       {/* Week progress bar */}
@@ -1068,46 +1069,35 @@ export default function TimesheetDetail() {
                 </p>
               )}
 
-              {/* Overtime comment */}
+              {/* Overtime comment — read-only display; modal handles editing */}
               {overtimeHours > 0 && (() => {
-                const draft = commentDrafts[day] ?? ''
                 const saved = dayData?.overtimeComment ?? ''
-                const unchanged = draft === saved
                 return (
-                  <div className="ml-36 mt-1.5 mb-1">
-                    {canEditComment ? (
-                      <div className="space-y-1">
-                        <textarea
-                          className="w-full text-[11px] text-muted-foreground bg-muted/30 border border-border/50 rounded-md px-2.5 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/40"
-                          rows={2}
-                          maxLength={500}
-                          placeholder="Optional: add context for overtime (e.g., client deadline)"
-                          value={draft}
-                          onChange={e => setCommentDrafts(prev => ({ ...prev, [day]: e.target.value }))}
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-muted-foreground/50">{draft.length}/500</span>
+                  <div className="ml-36 mt-1.5 mb-1 flex items-center gap-2">
+                    {saved
+                      ? <p className="text-[11px] text-muted-foreground italic flex-1">{saved}</p>
+                      : canEditComment && (
                           <button
-                            className="text-[11px] px-2.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40"
-                            disabled={unchanged || savingDay === day}
-                            onClick={async () => {
-                              setSavingDay(day)
-                              try {
-                                await dispatch(saveOvertimeComment({ timesheetId: id, day, comment: draft })).unwrap()
-                                toast.success('Comment saved')
-                              } catch (err) {
-                                toast.error(err || 'Failed to save comment')
-                              } finally {
-                                setSavingDay(null)
-                              }
+                            className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors"
+                            onClick={() => {
+                              setCommentDrafts(prev => ({ ...prev, [day]: '' }))
+                              setOtModal({ open: true, day })
                             }}
                           >
-                            {savingDay === day ? 'Saving…' : 'Save'}
+                            + Add overtime note
                           </button>
-                        </div>
-                      </div>
-                    ) : (
-                      saved && <p className="text-[11px] text-muted-foreground italic">{saved}</p>
+                        )
+                    }
+                    {canEditComment && saved && (
+                      <button
+                        className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors flex-shrink-0"
+                        onClick={() => {
+                          setCommentDrafts(prev => ({ ...prev, [day]: saved }))
+                          setOtModal({ open: true, day })
+                        }}
+                      >
+                        Edit note
+                      </button>
                     )}
                   </div>
                 )
@@ -1246,6 +1236,72 @@ export default function TimesheetDetail() {
                 disabled={actionLoading || !rejectReason.trim()}
               >
                 {actionLoading ? 'Rejecting…' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Overtime comment modal ───────────────────────────────────────── */}
+      {otModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-fade-in">
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">Overtime note</h3>
+              <button
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                onClick={() => setOtModal({ open: false, day: null })}
+                aria-label="Close overtime note"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Optionally explain the reason for overtime on{' '}
+              <strong className="text-foreground">
+                {otModal.day ? otModal.day.charAt(0) + otModal.day.slice(1).toLowerCase() : ''}
+              </strong>.
+            </p>
+            <div>
+              <textarea
+                className="input text-sm w-full h-20 resize-none"
+                placeholder="e.g. client deadline, production incident\u2026 (optional)"
+                maxLength={500}
+                value={commentDrafts[otModal.day] ?? ''}
+                onChange={e => setCommentDrafts(prev => ({ ...prev, [otModal.day]: e.target.value }))}
+                autoFocus
+              />
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5 text-right">
+                {(commentDrafts[otModal.day] ?? '').length}/500
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="btn-secondary flex-1 h-9 text-sm"
+                onClick={() => setOtModal({ open: false, day: null })}
+                disabled={savingDay === otModal.day}
+              >
+                Skip
+              </button>
+              <button
+                className="btn-primary flex-1 h-9 text-sm"
+                disabled={savingDay === otModal.day}
+                onClick={async () => {
+                  const day = otModal.day
+                  const comment = commentDrafts[day] ?? ''
+                  setSavingDay(day)
+                  try {
+                    await dispatch(saveOvertimeComment({ timesheetId: id, day, comment })).unwrap()
+                    toast.success('Overtime note saved')
+                  } catch (err) {
+                    toast.error(err || 'Failed to save note')
+                  } finally {
+                    setSavingDay(null)
+                    setOtModal({ open: false, day: null })
+                  }
+                }}
+              >
+                {savingDay === otModal.day ? 'Saving\u2026' : 'Save note'}
               </button>
             </div>
           </div>

@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
 import { EmptyState, SkeletonRows, PageTransition } from '../../components/ui'
 import PaginationBar from '../../components/PaginationBar'
 import SortableHeader from '../../components/SortableHeader'
 import { format } from 'date-fns'
+import { DATE_OPTIONS, getMonday, getMondayStr } from '../../lib/weekUtils'
 import toast from 'react-hot-toast'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -14,31 +16,13 @@ import {
   Building2, Users, Clock, Activity, ChevronDown,
   Send, Download, FileText, AlertTriangle, Zap, ArrowUpRight,
   ArrowDownRight, Minus, BarChart2, Lightbulb, Target,
+  FolderKanban, ChevronRight,
 } from 'lucide-react'
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CHART_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
-const DATE_OPTIONS = [
-  { label: 'This Week',   value: 'this_week',    weeksAgo: 0 },
-  { label: 'Last Week',   value: 'last_week',    weeksAgo: 1 },
-  { label: '2 Weeks Ago', value: 'two_weeks',    weeksAgo: 2 },
-  { label: '3 Weeks Ago', value: 'three_weeks',  weeksAgo: 3 },
-]
-
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function getMonday(weeksAgo = 0) {
-  const today = new Date()
-  const day = today.getDay()
-  const diff = today.getDate() - day + (day === 0 ? -6 : 1)
-  const monday = new Date(today)
-  monday.setDate(diff - weeksAgo * 7)
-  return monday
-}
-
-function getMondayStr(weeksAgo = 0) {
-  return format(getMonday(weeksAgo), 'yyyy-MM-dd')
-}
+// --- Helpers ---
 
 function calcUtil(dept) {
   if (!dept.employeeCount) return 0
@@ -132,6 +116,7 @@ function InsightItem({ icon: Icon, iconBg, text, highlight }) {
 
 // â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function Organization() {
+  const navigate = useNavigate()
   const [dateRange, setDateRange]       = useState('this_week')
   const [departments, setDepartments]   = useState([])
   const [trendData, setTrendData]       = useState([])
@@ -144,6 +129,7 @@ export default function Organization() {
   const [filterOpen, setFilterOpen]     = useState(false)
   const [reminderSending, setReminderSending] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
+  const [topProjects, setTopProjects]   = useState([])
 
   const actionsRef   = useRef(null)
   const filterRef    = useRef(null)
@@ -614,21 +600,63 @@ export default function Organization() {
           {/* Row 3: Insights + Table */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* Insights panel */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-amber-100 rounded-lg">
-                  <Lightbulb size={15} className="text-amber-600" />
+            {/* Insights + Top Projects column */}
+            <div className="space-y-6">
+
+              {/* Insights panel */}
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-amber-100 rounded-lg">
+                    <Lightbulb size={15} className="text-amber-600" />
+                  </div>
+                  <h2 className="text-base font-semibold text-foreground">Insights</h2>
                 </div>
-                <h2 className="text-base font-semibold text-foreground">Insights</h2>
+                {insights.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No data available.</p>
+                ) : (
+                  <div>
+                    {insights.map((ins, i) => <InsightItem key={i} {...ins} />)}
+                  </div>
+                )}
               </div>
-              {insights.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No data available.</p>
-              ) : (
-                <div>
-                  {insights.map((ins, i) => <InsightItem key={i} {...ins} />)}
+
+              {/* Top Projects panel */}
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-1.5 bg-indigo-100 rounded-lg">
+                    <FolderKanban size={15} className="text-indigo-600" />
+                  </div>
+                  <h2 className="text-base font-semibold text-foreground">Top Projects</h2>
                 </div>
-              )}
+                {topProjects.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No project data available.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {topProjects.map((p, i) => {
+                      const maxHours = topProjects[0]?.totalHours || 1
+                      const pct = Math.round((Number(p.totalHours) / Number(maxHours)) * 100)
+                      return (
+                        <button
+                          key={p.projectId}
+                          onClick={() => navigate(`/reports/project/${p.projectId}?week=${dateRange}&from=org`)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/60 transition-colors group text-left"
+                        >
+                          <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{p.projectName}</p>
+                            <div className="mt-1 h-1.5 bg-border rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-xs font-semibold text-muted-foreground shrink-0">{Number(p.totalHours).toFixed(1)}h</span>
+                          <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
             </div>
 
             {/* Department table */}

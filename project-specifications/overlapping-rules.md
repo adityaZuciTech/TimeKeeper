@@ -54,7 +54,7 @@ Project B → 13:00–17:00
 
 **Manual entry (addEntry / updateEntry):** Back-to-back entries are allowed. The overlap condition is exclusive: `newStart < existEnd AND newEnd > existStart`. Boundary-touching (e.g. 09:00–11:00 → 11:00–13:00) is not blocked.
 
-**Copy Last Week path (copyFromPreviousWeek):** STRICT/inclusive semantics. Boundary-touching IS treated as overlap (`newStart ≤ existEnd AND newEnd ≥ existStart`). The copy path is deliberately more conservative to prevent ambiguous back-to-back entries from being silently merged. Affected entries are skipped as `OVERLAP_STRICT` and shown in the copy summary panel.
+**Copy Last Week path (copyFromPreviousWeek):** Same exclusive semantics as manual entry. Back-to-back entries (e.g. 09:00–12:00 followed by 12:00–17:00) are allowed and will be copied. Only genuine time-range overlaps (`newStart < existEnd AND newEnd > existStart`) are skipped as `OVERLAP_STRICT` and shown in the copy summary panel.
 
 ---
 

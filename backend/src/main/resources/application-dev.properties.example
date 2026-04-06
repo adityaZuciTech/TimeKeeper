@@ -1,4 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
+logging.level.org.springframework.security=INFO
+spring.jpa.hibernate.ddl-auto=update
+# ─────────────────────────────────────────────────────────────────────────────
 #  application-dev.properties.example
 #  Copy this file to application-dev.properties and fill in your real values.
 #  application-dev.properties is gitignored — never commit real credentials.

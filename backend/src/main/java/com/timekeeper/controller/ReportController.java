@@ -83,4 +83,28 @@ public class ReportController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    @GetMapping("/project-effort-list")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ReportResponse.ProjectEffortListReport>> getProjectEffortList(
+            @AuthenticationPrincipal Employee currentUser,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate,
+            @RequestParam(required = false, defaultValue = "false") boolean includeZero) {
+        String role = currentUser.getRole().name();
+        ReportResponse.ProjectEffortListReport report =
+                reportService.getProjectEffortList(currentUser.getId(), role, weekStartDate, includeZero);
+        return ResponseEntity.ok(ApiResponse.success(report));
+    }
+
+    @GetMapping("/project-detail")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ReportResponse.ProjectDetailReport>> getProjectDetail(
+            @AuthenticationPrincipal Employee currentUser,
+            @RequestParam String projectId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
+        String role = currentUser.getRole().name();
+        ReportResponse.ProjectDetailReport report =
+                reportService.getProjectDetail(currentUser.getId(), role, projectId, weekStartDate);
+        return ResponseEntity.ok(ApiResponse.success(report));
+    }
 }

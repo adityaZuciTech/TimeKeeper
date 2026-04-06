@@ -148,6 +148,17 @@ public class TimesheetService {
             throw new BusinessException("Cannot submit an empty timesheet. Please log at least one work entry.");
         }
 
+        // Prevent submitting a timesheet whose only work entries are on future dates.
+        // Copied entries for Wed/Thu/Fri are valid to keep as placeholders but cannot
+        // be the sole basis for submission — the manager would be approving hours not yet worked.
+        final LocalDate submitWeekStart = timesheet.getWeekStartDate();
+        boolean hasCurrentOrPastWorkEntry = entries.stream()
+                .filter(e -> e.getEntryType() == TimeEntry.EntryType.WORK)
+                .anyMatch(e -> !submitWeekStart.plusDays(DAY_OFFSET.get(e.getDay())).isAfter(LocalDate.now()));
+        if (!hasCurrentOrPastWorkEntry) {
+            throw new BusinessException("Cannot submit a timesheet that only contains future-dated entries. Please log at least one work entry for today or a past day.");
+        }
+
         timesheet.setStatus(Timesheet.TimesheetStatus.SUBMITTED);
         timesheet = timesheetRepository.save(timesheet);
 
@@ -416,8 +427,6 @@ public class TimesheetService {
         List<Holiday> weekHolidays = holidayRepository.findByDateBetweenOrderByDateAsc(weekStart, weekEnd);
         Set<LocalDate> holidayDates = weekHolidays.stream()
                 .map(Holiday::getDate).collect(Collectors.toSet());
-        Map<LocalDate, Holiday> holidayMap = weekHolidays.stream()
-                .collect(Collectors.toMap(Holiday::getDate, h -> h));
 
         List<Leave> weekLeaves = leaveRepository.findApprovedLeavesForWeek(
                 timesheet.getEmployee().getId(), weekStart, weekEnd);
@@ -464,7 +473,7 @@ public class TimesheetService {
                 }
             }
 
-            boolean editable = !isLocked && dayStatus.equals("WORK") && !dayDate.isAfter(LocalDate.now());
+            boolean editable = !isLocked && dayStatus.equals("WORK");
 
             DayOvertimeData overtime = computeDayOvertime(allEntries, dayDate, holidayDates, weekLeaves);
             totalRegularHours = totalRegularHours.add(overtime.regularHours());
@@ -877,11 +886,11 @@ public class TimesheetService {
                 continue;
             }
 
-            // e. STRICT overlap (boundary-touching = overlap)
+            // e. Overlap check (boundary-touching is allowed, same as manual entry)
             TimeEntry conflictEntry = null;
             for (TimeEntry ve : virtualEntries) {
                 if (ve.getDay() == se.getDay() && ve.getStartTime() != null && ve.getEndTime() != null) {
-                    if (hasBoundaryOverlap(se.getStartTime(), se.getEndTime(),
+                    if (hasOverlap(se.getStartTime(), se.getEndTime(),
                             ve.getStartTime(), ve.getEndTime())) {
                         conflictEntry = ve;
                         break;
@@ -947,16 +956,15 @@ public class TimesheetService {
     }
 
     /**
-     * Overlap check used by the copy path — STRICT inclusive semantics.
+     * Overlap check used by the copy path — exclusive boundary semantics (same as manual entry).
      * <p>
-     * Boundary-touching entries (e.g., 09:00–13:00 and 13:00–17:00) ARE considered
-     * overlapping: the shared boundary point means they cannot both occupy the same slot.
-     * Condition: newStart &lt;= existEnd AND newEnd &gt;= existStart (both inclusive).
+     * Back-to-back entries (e.g., 09:00–13:00 and 13:00–17:00) share only a boundary point
+     * and are NOT considered overlapping.
+     * Condition: newStart &lt; existEnd AND newEnd &gt; existStart (both exclusive).
      */
-    private boolean hasBoundaryOverlap(LocalTime newStart, LocalTime newEnd,
-                                        LocalTime existStart, LocalTime existEnd) {
-        // !newStart.isAfter(existEnd)  ≡  newStart <= existEnd
-        // !newEnd.isBefore(existStart) ≡  newEnd   >= existStart
-        return !newStart.isAfter(existEnd) && !newEnd.isBefore(existStart);
+    private boolean hasOverlap(LocalTime newStart, LocalTime newEnd,
+                                LocalTime existStart, LocalTime existEnd) {
+        // newStart < existEnd AND newEnd > existStart
+        return newStart.isBefore(existEnd) && newEnd.isAfter(existStart);
     }
 }

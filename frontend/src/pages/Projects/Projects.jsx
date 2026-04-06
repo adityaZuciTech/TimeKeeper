@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import {
   fetchProjects, createProject, updateProject, updateProjectStatus,
   selectProjects, selectProjectsLoading,
@@ -16,7 +17,7 @@ import {
   Plus, Search, MoreHorizontal, X, ChevronRight,
   Calendar, Building2, Users, Clock, Briefcase,
   AlertTriangle, CheckCircle2, PauseCircle, Zap,
-  Edit3, RefreshCw,
+  Edit3, RefreshCw, BarChart2,
 } from 'lucide-react'
 
 // --- Constants ----------------------------------------------------------------
@@ -183,6 +184,7 @@ function RowMenu({ proj, onEdit, onStatusChange }) {
 
 // --- Project Drawer -----------------------------------------------------------
 function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort }) {
+  const navigate = useNavigate()
   const [effort, setEffort]     = useState(null)
   const [loading, setLoading]   = useState(false)
 
@@ -346,7 +348,13 @@ function ProjectDrawer({ proj, onClose, onEdit, onStatusChange, canLoadEffort })
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex-shrink-0">
+        <div className="px-6 py-4 border-t border-border flex-shrink-0 space-y-2">
+          <button
+            onClick={() => { onClose(); navigate(`/reports/project/${proj.id}?from=projects`) }}
+            className="w-full gap-2 inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+          >
+            <BarChart2 size={14} /> View Effort Report
+          </button>
           <button
             onClick={() => onEdit(proj)}
             className="btn-primary w-full gap-2"

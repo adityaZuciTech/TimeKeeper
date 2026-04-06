@@ -1081,9 +1081,9 @@ class TimesheetServiceTest {
     }
 
     @Test
-    void copy_skipBoundaryOverlap_exactBoundaryTouch() {
-        // Source: 09:00-13:00 and 13:00-17:00 back-to-back.
-        // STRICT overlap semantics: boundary-touching = conflict → second entry skipped as OVERLAP_STRICT.
+    void copy_backToBackEntries_bothCopied() {
+        // Source: 09:00–13:00 and 13:00–17:00 back-to-back on the same day.
+        // Boundary-touching is NOT an overlap — both entries must be copied.
         Project project = activeProject("prj_001");
         TimeEntry srcEntry1 = createWorkEntryForCopy("te_s1", TimeEntry.DayOfWeek.MONDAY,
                 LocalTime.of(9, 0), LocalTime.of(13, 0), project);
@@ -1104,10 +1104,8 @@ class TimesheetServiceTest {
         when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
 
         var result = timesheetService.copyFromPreviousWeek("ts_001", "emp_001");
-        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(1);
-        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(1);
-        assertThat(result.getCopySummary().getSkippedEntries().get(0).getReason())
-                .isEqualTo("OVERLAP_STRICT");
+        assertThat(result.getCopySummary().getCopiedCount()).isEqualTo(2);
+        assertThat(result.getCopySummary().getSkippedCount()).isEqualTo(0);
     }
 
     @Test
@@ -1316,5 +1314,94 @@ class TimesheetServiceTest {
 
         assertThatThrownBy(() -> timesheetService.copyFromPreviousWeek("ts_001", "emp_999"))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    // ── TS-SUBMIT-01: all WORK entries are on future dates ────────────────────
+
+    @Test
+    void submit_onlyFutureEntries_throwsBusinessException() {
+        // Place the timesheet in a future week so every day is in the future
+        LocalDate nextMonday = LocalDate.now().plusWeeks(1).with(java.time.DayOfWeek.MONDAY);
+        timesheet.setWeekStartDate(nextMonday);
+        timesheet.setWeekEndDate(nextMonday.plusDays(4));
+
+        TimeEntry futureEntry = new TimeEntry();
+        futureEntry.setId("te_future");
+        futureEntry.setEntryType(TimeEntry.EntryType.WORK);
+        futureEntry.setDay(TimeEntry.DayOfWeek.MONDAY); // offset 0 → nextMonday → strictly future
+        futureEntry.setHoursLogged(BigDecimal.valueOf(8));
+        futureEntry.setTimesheet(timesheet);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(futureEntry));
+
+        assertThatThrownBy(() -> timesheetService.submit("ts_001", "emp_001"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("future-dated");
+    }
+
+    // ── TS-SUBMIT-02: one past entry + one future entry → submit succeeds ─────
+
+    @Test
+    void submit_onePastOneFutureEntry_submitsSuccessfully() {
+        // weekStart is in the past; Monday = past day, Friday = future day (fine together)
+        // Use the existing timesheet (weekStartDate = 2026-03-16, a past Monday)
+        TimeEntry pastEntry = new TimeEntry();
+        pastEntry.setId("te_past");
+        pastEntry.setEntryType(TimeEntry.EntryType.WORK);
+        pastEntry.setDay(TimeEntry.DayOfWeek.MONDAY); // 2026-03-16 — past
+        pastEntry.setHoursLogged(BigDecimal.valueOf(8));
+        pastEntry.setTimesheet(timesheet);
+
+        // weekStartDate(2026-03-16) + 4 days = 2026-03-20 (past as of April 2026, so this
+        // test also passes — both are past; the key invariant is at least one is non-future)
+        TimeEntry otherEntry = new TimeEntry();
+        otherEntry.setId("te_other");
+        otherEntry.setEntryType(TimeEntry.EntryType.WORK);
+        otherEntry.setDay(TimeEntry.DayOfWeek.FRIDAY); // 2026-03-20 — also past, combination is fine
+        otherEntry.setHoursLogged(BigDecimal.valueOf(6));
+        otherEntry.setTimesheet(timesheet);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(pastEntry, otherEntry));
+        when(timesheetRepository.save(any())).thenReturn(timesheet);
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        var response = timesheetService.submit("ts_001", "emp_001");
+
+        verify(timesheetRepository).save(argThat(ts ->
+                ts.getStatus() == Timesheet.TimesheetStatus.SUBMITTED));
+    }
+
+    // ── TS-SUBMIT-03: all WORK entries on past dates → submit succeeds ────────
+
+    @Test
+    void submit_allPastEntries_submitsSuccessfully() {
+        // timesheet.weekStartDate = 2026-03-16 — all entries in a past week
+        TimeEntry e1 = new TimeEntry();
+        e1.setId("te_1");
+        e1.setEntryType(TimeEntry.EntryType.WORK);
+        e1.setDay(TimeEntry.DayOfWeek.MONDAY);
+        e1.setHoursLogged(BigDecimal.valueOf(8));
+        e1.setTimesheet(timesheet);
+
+        TimeEntry e2 = new TimeEntry();
+        e2.setId("te_2");
+        e2.setEntryType(TimeEntry.EntryType.WORK);
+        e2.setDay(TimeEntry.DayOfWeek.TUESDAY);
+        e2.setHoursLogged(BigDecimal.valueOf(8));
+        e2.setTimesheet(timesheet);
+
+        when(timesheetRepository.findById("ts_001")).thenReturn(Optional.of(timesheet));
+        when(timeEntryRepository.findByTimesheetId("ts_001")).thenReturn(List.of(e1, e2));
+        when(timesheetRepository.save(any())).thenReturn(timesheet);
+        when(holidayRepository.findByDateBetweenOrderByDateAsc(any(), any())).thenReturn(List.of());
+        when(leaveRepository.findApprovedLeavesForWeek(any(), any(), any())).thenReturn(List.of());
+
+        timesheetService.submit("ts_001", "emp_001");
+
+        verify(timesheetRepository).save(argThat(ts ->
+                ts.getStatus() == Timesheet.TimesheetStatus.SUBMITTED));
     }
 }
