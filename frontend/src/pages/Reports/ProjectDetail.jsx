@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { reportService } from '../../services/reportService'
 import Layout from '../../components/Layout'
@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import {
   ArrowLeft, FolderKanban, Users, Clock, ArrowUpRight,
-  ArrowDownRight, Minus, ChevronRight, Building2,
+  ArrowDownRight, Minus, ChevronRight, Building2, ChevronDown,
 } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ function AreaTooltip({ active, payload, label }) {
 export default function ProjectDetail() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const weekParam = searchParams.get('week') || 'this_week'
   const fromParam  = searchParams.get('from') || 'reports'
@@ -68,6 +68,18 @@ export default function ProjectDetail() {
 
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -177,11 +189,41 @@ export default function ProjectDetail() {
             </span>
           </div>
         </div>
-        <button onClick={handleBack} className="btn-secondary gap-2 text-sm flex-shrink-0 self-start">
-          <ArrowLeft size={14} />
-          <span className="hidden sm:inline">Back to Project Effort</span>
-          <span className="sm:hidden">Back</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0 self-start">
+          {/* Week selector */}
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setFilterOpen(v => !v)}
+              className="btn-secondary gap-2 text-sm"
+            >
+              {selectedOption.label}
+              <ChevronDown size={14} className={`transition-transform duration-200 ${filterOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {filterOpen && (
+              <div className="absolute right-0 top-full mt-2 w-44 bg-card border border-border rounded-xl shadow-lg py-1 z-30">
+                {DATE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setSearchParams({ week: opt.value, from: fromParam })
+                      setFilterOpen(false)
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors
+                      ${weekParam === opt.value ? 'text-primary font-medium' : 'text-foreground'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleBack} className="btn-secondary gap-2 text-sm">
+            <ArrowLeft size={14} />
+            <span className="hidden sm:inline">Back to Project Effort</span>
+            <span className="sm:hidden">Back</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Scope + freshness ───────────────────────────────────────────── */}
